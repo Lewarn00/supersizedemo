@@ -33,7 +33,6 @@ import {Idl, Program, Provider, Wallet, AnchorProvider} from "@coral-xyz/anchor"
 import {SimpleProvider} from "./components/Wallet";
 import { Connection, clusterApiUrl, Keypair, LAMPORTS_PER_SOL, Transaction, sendAndConfirmTransaction,SystemProgram } from '@solana/web3.js';
 import NodeWallet from "@coral-xyz/anchor/dist/cjs/nodewallet";
-import BN from 'bn.js';
 
 //import { Map } from "../../../target/types/map";
 const bs58 = require('bs58');

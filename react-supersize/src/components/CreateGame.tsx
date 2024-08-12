@@ -11,7 +11,7 @@ type FormData = [number, number, number, number, number, number, boolean];
 
 const CreateGame: React.FC<gameProps> = ({ initFunction }) => {
     // Initialize the state as an array with default values
-    const [formData, setFormData] = useState<FormData>([1500, 1500, 100, 2, 0, 20, false]);
+    const [formData, setFormData] = useState<FormData>([1500, 1500, 100, 7, 0, 10, false]);
   
     // Handle changes in the form inputs
     const handleChange = (index: number) => (e: React.ChangeEvent<HTMLInputElement>) => {

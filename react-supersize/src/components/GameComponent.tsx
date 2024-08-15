@@ -74,6 +74,13 @@ const GameComponent: React.FC<GameComponentProps> = ({ gameId, players, visibleF
     ctx.fillStyle = '#13F195'; // Change color as needed
     ctx.fill();
     ctx.stroke();
+
+    // Draw the player's score at the center of the player
+    ctx.fillStyle = 'black'; // Text color
+    ctx.font = `${blob.radius * scale * 0.5}px Arial`; // Font size relative to the player radius
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(Math.round(blob.score).toString(), blob.x * scale, blob.y * scale);
   };
 
   const drawFood = (ctx: CanvasRenderingContext2D, food: Food, scale: number) => {

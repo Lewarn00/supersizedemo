@@ -7,11 +7,11 @@ type gameProps = {
     initFunction: (...args: any[]) => void;  // General function accepting any arguments
 };
 
-type FormData = [number, number, number, number, number, number, boolean];
+type FormData = [number, number, number, number, number, number, boolean, string];
 
 const CreateGame: React.FC<gameProps> = ({ initFunction }) => {
     // Initialize the state as an array with default values
-    const [formData, setFormData] = useState<FormData>([1500, 1500, 100, 10, 0, 20, false]);
+    const [formData, setFormData] = useState<FormData>([1500, 1500, 100, 10, 0, 20, false, "Supersize"]);
   
     // Handle changes in the form inputs
     const handleChange = (index: number) => (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -24,7 +24,15 @@ const CreateGame: React.FC<gameProps> = ({ initFunction }) => {
       if (type === 'checkbox') {
         updatedFormData[index] = checked as boolean;  // Force boolean type for checkbox
       } else {
-        updatedFormData[index] = parseFloat(value) as number;  // Force number type for others
+        if (index == 7){
+          updatedFormData[index] = value as string;  // Force number type for others
+        }
+        else{
+          updatedFormData[index] = parseFloat(value) as number;  // Force number type for others
+          if (index == 0) {
+            updatedFormData[1] = parseFloat(value) as number; 
+          }
+        }
       }
   
       setFormData(updatedFormData);
@@ -39,20 +47,16 @@ const CreateGame: React.FC<gameProps> = ({ initFunction }) => {
         <form className="form-box" onSubmit={handleSubmit}>
           <h2 className="form-title">Game Settings</h2>
           <label>
-          <span style={{marginBottom:"5px", marginLeft:"10px" }}>Game Size</span>
-            <input className="no-arrows"  id="forminput" type="number" name="size" value={String(formData[0])} onChange={() => {handleChange(0); handleChange(1);}} />
+          <span style={{marginBottom:"5px", marginLeft:"10px" }}>Name</span>
+            <input type="text"  id="forminput" name="gameName" value={String(formData[7])} onChange={handleChange(7)} />
           </label>
           <label>
-          <span style={{marginBottom:"5px", marginLeft:"10px" }}>Buy In</span>
-            <input className="no-arrows"  id="forminput" type="number" name="entryFee" value={String(formData[2])} onChange={handleChange(2)} />
+          <span style={{marginBottom:"5px", marginLeft:"10px" }}>Size</span>
+            <input className="no-arrows"  id="forminput" type="number" name="size" value={String(formData[0])} onChange={handleChange(0)} />
           </label>
           <label>
           <span style={{marginBottom:"5px", marginLeft:"10px" }}>Max Players</span>
             <input className="no-arrows"  id="forminput" type="number" name="maxPlayers" value={String(formData[3])} onChange={handleChange(3)} />
-          </label>
-          <label>
-          <span style={{marginBottom:"5px", marginLeft:"10px" }}>Token</span>
-            <input id="forminput" type="text" name="token" value={'token address'}/>
           </label>
           <label style={{flexDirection:"row"}}>
           <span style={{marginBottom:"5px", marginLeft:"10px" }}>Frozen</span>

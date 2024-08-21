@@ -69,11 +69,40 @@ const GameComponent: React.FC<GameComponentProps> = ({ gameId, players, visibleF
   }, [gameId, players, visibleFood, currentPlayer, screenSize, scale]);
 
   const drawPlayer = (ctx: CanvasRenderingContext2D, blob: Blob, scale: number) => {
+    // Determine glow intensity based on speed
+    let glowSize = 0;
+    let glowIntensity = 'rgba(19, 241, 149, 0)'; // Default no glow
+
+    if (blob.speed > 10) {
+        glowSize = 40 * scale; // Significant glow at speed 10
+        glowIntensity = 'rgba(19, 241, 149, 0.5)';
+    }
+    if (blob.speed > 15) {
+        glowSize = 70 * scale; // Brighter and bigger glow at speed 15
+        glowIntensity = 'rgba(19, 241, 149, 0.7)';
+    }
+    if (blob.speed > 20) {
+        glowSize = 100 * scale; // Even brighter and bigger glow at speed 20
+        glowIntensity = 'rgba(19, 241, 149, 0.9)';
+    }
+    if (blob.speed > 25) {
+        glowSize = 150 * scale; // Maximum glow at speed 25+
+        glowIntensity = 'rgba(19, 241, 149, 1.0)';
+    }
+
+    ctx.shadowBlur = glowSize;
+    ctx.shadowColor = glowIntensity;
+
+    // Draw the player
     ctx.beginPath();
     ctx.arc(blob.x * scale, blob.y * scale, blob.radius * scale, 0, 2 * Math.PI);
-    ctx.fillStyle = '#13F195'; // Change color as needed
+    ctx.fillStyle = '#13F195'; // Player color
     ctx.fill();
     ctx.stroke();
+
+    // Reset shadow for the next draw calls
+    ctx.shadowBlur = 0;
+    ctx.shadowColor = 'rgba(0, 0, 0, 0)';
 
     // Draw the player's score at the center of the player
     ctx.fillStyle = 'black'; // Text color
@@ -81,7 +110,7 @@ const GameComponent: React.FC<GameComponentProps> = ({ gameId, players, visibleF
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(Math.round(blob.score).toString(), blob.x * scale, blob.y * scale);
-  };
+};
 
   const drawFood = (ctx: CanvasRenderingContext2D, food: Food, scale: number) => {
     ctx.beginPath();
@@ -92,7 +121,7 @@ const GameComponent: React.FC<GameComponentProps> = ({ gameId, players, visibleF
   };
 
   const drawBorder = (ctx: CanvasRenderingContext2D, currentPlayer: Blob, screenSize: { width: number; height: number }, scale: number) => {
-    const gameSize = 1500;
+    const gameSize = screenSize.width;
     const offsetX = currentPlayer.x - screenSize.width / 2;
     const offsetY = currentPlayer.y - screenSize.height / 2;
 

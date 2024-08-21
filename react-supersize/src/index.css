@@ -48,9 +48,11 @@ body {
     align-items: center; 
     justify-content: space-between;
     height: fit-content;
-    margin-top: 2vh;
     margin-bottom: 0;
     height: 4vh;
+    background-color: #000;
+    z-index: 0;
+    backdrop-filter: blur(10px);
 }
 .titleBackground{
   color: #eee;
@@ -93,6 +95,7 @@ overflow: hidden;
     z-index: 999999;
     margin-left: auto;
     border-radius: 5px;
+    margin-top: -5vh;
 }
 .wallet-buttons .wallet-adapter-button{
   border: 1px solid rgb(196, 181, 253);
@@ -107,11 +110,13 @@ overflow: hidden;
 }
 
 .titleText{
-    color: #eee;
+    color: #FFF;
     font-family: 'Conthrax';
-    font-size: 3vw;
-    margin-left: 2vw;
-    margin-right: 1vw;
+    font-size: 3rem;
+    padding-left: 2vw;
+    padding-top: 1vh;
+    z-index: 10;
+    opacity: 1 !important;
 }
 .titleImg{
     margin-left: 2vw;
@@ -203,14 +208,14 @@ overflow: hidden;
   background-color: #FFF;
   grid-column: span 3;
   display: flex;
-  margin: 1vw;
-  height: 5vh;
+  margin: 1em;
+  height: 2.5em;
   align-items: center;
   justify-content: center;
   border-radius: 10px;
   border: 1px solid #DCDCDC;
   text-align: left;
-  margin-top: 8vh;
+  margin-top: 5em;
   font-size: 1rem;
   font-family: 'Terminus';
   overflow: hidden;
@@ -222,7 +227,7 @@ overflow: hidden;
   overflow-y: auto;
   position: fixed;
   align-self: flex-start;
-  width: 67%;
+  width: 43%;
   border-radius: 10px;
   overflow-y: scroll;
   background:"#000";
@@ -234,14 +239,14 @@ overflow: hidden;
 }
 
 .gameSelect {
-  grid-column: span 2;
+  grid-column: span 1;
   display: inline-flex;
   justify-content: flex-start; /* Aligns content to the left */
   align-items: center;
   margin-left: 1vw;
 }
 .gameSelectButton{
-  width: 67%;
+  width: 43%;
   background-color: #FFF;
   display: flex;
   flex-direction: column;
@@ -257,23 +262,70 @@ overflow: hidden;
   align-items: center;
   margin-right: 1vw;
 }
+
+.playNowButton{
+  width: 100%;
+  background: #FFF !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 3em;
+  padding-right: 0.4em;
+  padding-left: 0.4em;
+  border-radius: 0.8em;
+  border: 1px solid white;
+  font-family: 'Conthrax' !important;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: 'opacity 0.3s ease background 0.3s ease 0s, color 0.3s ease 0s';
+  z-index: 10;
+}
+.playNowButton:hover{
+  background-color: #000 !important;
+  color: #eee;
+  border: 1px solid white !important;
+  box-shadow: none !important;
+}    
+
 .playButton{
+  width: 100%;
+  background: #FFF !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 3em;
+  /*padding-top: 1vh;
+  padding-bottom: 1vh;*/
+  border-radius: 1em;
+  border: 1px solid white;
+  font-family: 'Conthrax' !important;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: 'opacity 0.3s ease background 0.3s ease 0s, color 0.3s ease 0s';
+  z-index: 10;
+}
+.playButton:hover{
+  background-color: #000 !important;
+  color: #eee;
+  border: 1px solid white !important;
+  box-shadow: none !important;
+}    
+
+.createGameButton{
   width: 100%;
   background-color: #FFF;
   display: flex;
   align-items: center;
   justify-content: center;
-  height: auto;
-  padding-top: 1vh;
-  padding-bottom: 1vh;
-  border-radius: 1rem;
+  height: 3em;
+  border-radius: 1em;
   border: 1px solid white;
   font-family: 'Conthrax' !important;
   font-size: 1rem;
   cursor: pointer;
   transition: 'opacity 0.3s ease background 0.3s ease 0s, color 0.3s ease 0s';
 }
-.playButton:hover{
+.createGameButton:hover{
   background-color: #000;
   color: #eee;
 }
@@ -354,6 +406,7 @@ overflow: hidden;
 }
 .wallet-buttons button{
     width: auto;
+    margin-top:5vh;
     margin-right: 2vw;
 }
 
@@ -619,6 +672,104 @@ overflow: hidden;
     animation: spin 1s ease infinite;
 }
 
+.info-container {
+  display: flex;
+  width: 100%;
+  overflow-y: auto; /* Allow scrolling */
+  margin-top: -20vh;
+}
+
+.info-image-container {
+  width: 35%;
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+  overflow: hidden;
+  opacity: 1;
+  transition: opacity 1s ease-in-out;
+}
+
+.info-spinning-image {
+  width: 50%;
+  height: auto;
+  transition: transform 0.2s ease-out;
+}
+
+.info-text-container {
+  width: 65%;
+  padding: 20px;
+  overflow-y: auto;
+  padding-top:20vh;
+  padding-right: 6vw;
+}
+
+.info-scrolling-text {
+  height: 200%; /* For example, make the text container taller than the viewport */
+  color: white;
+  font-family: 'Terminus';
+  font-size: 5rem;
+}
+
+.info-container::-webkit-scrollbar {
+  width: 10px;
+}
+
+.info-container::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 10px;
+}
+
+.info-container::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+.info-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  background-color: #222;
+  color: #fff;
+  opacity: 0;
+  transition: opacity 1s ease-in-out;
+  position: relative;
+  top: 90vh;
+}
+.info-footer.visible {
+  opacity: 1;
+}
+
+.footer-left {
+  display: flex;
+  align-items: center;
+}
+
+.footer-logo {
+  height: 50px;
+  margin-right: 10px;
+}
+
+.footer-name {
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.footer-right {
+  display: flex;
+  gap: 15px;
+}
+
+.footer-social-link {
+  color: #fff;
+  text-decoration: none;
+  transition: color 0.3s;
+}
+
+.footer-social-link:hover {
+  color: #aaa;
+}
 @keyframes spin {
     0% {
         transform: rotate(0deg);
@@ -626,4 +777,12 @@ overflow: hidden;
     100% {
         transform: rotate(360deg);
     }
+}
+@keyframes bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(5px);
+  }
 }

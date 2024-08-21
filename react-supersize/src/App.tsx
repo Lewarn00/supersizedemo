@@ -43,21 +43,6 @@ const bs58 = require('bs58');
 
 const WORLD_INSTANCE_ID = 4;
 
-// Components
-/*
-const MAP_COMPONENT = new PublicKey("4N4sCnoj54MHH3i4GvQDtFKrW7qXHNnZJDaPbBUkdLgM");
-const PLAYERS_COMPONENT = new PublicKey("4eBxpSfDfvDZsxRsVJffJ36iXeqdQWgNZnQ4v9fB2Wv2");
-
-// Systems
-const CHARGE_ATTACK = new PublicKey("5SBr9xVUzcZvWsQQNoM2nkPCiy9cJMBCqbqef7QJUai5");
-const MOVEMENT = new PublicKey("4Kt6RcZqpg6ACdW8s12PvBJuT41Eyth38HPt1sFQKTD2");
-const MOVEMENT2 = new PublicKey("8pt8Zuzu17zpfPWyDiQdfg1E7Vd4AooxPhrry3HSxz9R");
-const INIT_GAME = new PublicKey("AmFgpUC4aeMHuxwWacdfhP2Zm87UhbQNE5GfGGz2qqGe");
-const EXIT_GAME = new PublicKey("6BMA8V5xXd7n5PKDPHBYpSjFA2SaEaH9qBSVjczRNF56");
-const JOIN_GAME = new PublicKey("3s6QDH2QqbYFwtdoZLf2rdbvkSfu9tZzjZQAKL7zn7fx");
-const MOVEMENT_LITE = new PublicKey("GzXY6vgrHF3zEnBDWXrEx4vTHZ9gqKGnib3B9EiDbnjF");
-const EAT = new PublicKey("Dcqcj2TjcauBe2eCghLKRVew3RHWhCNJPaJEaFWYwnYk");*/
-
 //new
 const PLAYER_COMPONENT = new PublicKey("6Fop7M4mMiaychdgjqfbG1T9nCakkQ3qYiJdCvWqoNUk"); //anchor.workspace.Player1 as Program<Player1>;
 const MOVEMENT = new PublicKey("D8FAfmH5VUExyXkR1LauJ1AegDo4oBm1hJeC1pM8moSF");
@@ -67,6 +52,7 @@ const FOOD_COMPONENT = new PublicKey("GpcXtob64TmsL9gGCk44EBoQWS8SSej9vU1kJgFVE4
 const MAP_COMPONENT = new PublicKey("2NtsDp7az1CxG1v6HFPWekYQkhbJC7ZVHFF5GBSGaC7K");
 const INIT_GAME = new PublicKey("BYA1jUA9yTtdxoU8QECwW4vi9aojn1KQaxfQXRffEqeC");
 const EAT_FOOD = new PublicKey("BMVTi61fTnQCtoGiMi1m4eXKnxGmxDoTcLL2CV3dAZDp");
+const EAT_PLAYER = new PublicKey("53uMER8y9i2NYzLdJu97guJtmkZBRdL55G8NXCo3rALt");
 
 interface Food {
     x: number;
@@ -87,6 +73,11 @@ interface Blob {
 type ActiveGame = {
     worldPda: PublicKey;
     worldId: BN;
+    delegated: boolean;
+    name: string;
+    active_players: number;
+    max_players: number;
+    size: number;
   };
 
 const App: React.FC = () => {
@@ -136,25 +127,24 @@ const App: React.FC = () => {
     const [currentTPS, setCurrentTPS] = useState(0);
     const [price, setPrice] = useState(0);
     const [confirmedXY, setConfirmedXY] = useState<Transaction | null>(null);
+    const [queueXY, setQueueXY] = useState<Food[]>([]);
     const scale = 1;
-    const [screenSize, setScreenSize] = useState({width: 1500,height: 1500}); //530*3,300*3
+    const [screenSize, setScreenSize] = useState({width: 2000,height: 2000}); //530*3,300*3
     const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
     const [transactionError, setTransactionError] = useState<string | null>(null);
     const [transactionSuccess, setTransactionSuccess] = useState<string | null>(null);
     const [activeGameIds, setActiveGameIds] = useState<PublicKey[]>([new PublicKey('4gc82J1Qg9vJh6BcUiTsP73NCCJNF66dvk4vcx9JP7Ri'),new PublicKey('uk8PU7wgRzrqhibkhwQzyfJ33BnvmAzRCbNNvfNWVVd')]); //new PublicKey('DS3511vmVxC4MQpiAQawsh8ZmRTy59KqeDRH9vqUcfvd')
     const [activeGames, setActiveGames] = useState<ActiveGame[]>([{
-        worldId: new anchor.BN(1074),
-        worldPda: new PublicKey('828ckQc8MjVGTuzM2GCiwUREiuUzypPJTg8Gai3LCD8D'),
+        worldId: new anchor.BN(1206),
+        worldPda: new PublicKey('BP8ejJTpAK5ULgA2Q2LPEkMYAZuTd2Adb9hJkcQL9woP'),
+        delegated: false,
     } as ActiveGame,
     {
-        worldId: new anchor.BN(1075),
-        worldPda: new PublicKey('EXJzqzrHvbwem6Lk3q8aEBkoe8fUa86yGR4f7qJ2tCN'),
-    } as ActiveGame,
-    {
-        worldId: new anchor.BN(1076),
-        worldPda: new PublicKey('8ndgdRMN47mcnZurWdXdc91uZQHUpV9ubYuhBiZ6pS7K'),
+        worldId: new anchor.BN(1207),
+        worldPda: new PublicKey('DyvBpBtm8FZVjo7ePsQQZHXK9wWHwhikDsWh6imst2q'),
+        delegated: false,
     } as ActiveGame]);
-    const [openGameInfo, setOpenGameInfo] = useState<boolean[]>(new Array(activeGameIds.length).fill(false));
+    const [openGameInfo, setOpenGameInfo] = useState<boolean[]>(new Array(activeGames.length).fill(false));
     let entityMatch = useRef<PublicKey | null>(null);
     let playerEntities = useRef<PublicKey[]>([]);
     let foodEntities = useRef<PublicKey[]>([]);
@@ -184,7 +174,7 @@ const App: React.FC = () => {
         window.open('https://docs.supersize.app/', '_blank');
     }, []); 
     const openX = useCallback(() => {
-        window.open('https://x.com/SUPERSIZEapp', '_blank');
+        window.open('https://x.com/SUPERSIZEgg', '_blank');
     }, []); 
     const runCreatingGame = useCallback(() => {
         setCreatingGame(true);
@@ -199,13 +189,10 @@ const App: React.FC = () => {
         //console.log("Fetched IDL:", idl);
 
         if (!idl) throw new Error('IDL not found');
-        // Initialize the program with the dynamically fetched IDL
-        //const programId = new Program(idl, provider.current);
-        //console.log(idl,component, programId, provider.current)
+
         return new Program(idl, provider);
     }, [provider]);
 
-    // Helpers to Dynamically fetch the IDL and initialize the components clients
     const getComponentsClient = useCallback(async (component: PublicKey): Promise<Program> => {
         //console.log("Fetching IDL for component:", component.toString());
         //console.log("Provider status:", provider.current);
@@ -214,21 +201,9 @@ const App: React.FC = () => {
         //console.log("Fetched IDL:", idl);
 
         if (!idl) throw new Error('IDL not found');
-        // Initialize the program with the dynamically fetched IDL
-        //const programId = new Program(idl, provider.current);
-        //console.log(idl,component, programId, provider.current)
+
         return new Program(idl, providerEphemeralRollup);
     }, [providerEphemeralRollup]);
-
-    // Initialize the components clients to access the parsed account data
-   /* useEffect(() => {
-        const initializeComponents = async () => {
-            playersComponentClient.current = await getComponentsClient(PLAYER_COMPONENT);
-            mapComponentClient.current = await getComponentsClient(MAP_COMPONENT);
-            foodComponentClient.current = await getComponentsClient(FOOD_COMPONENT);
-        };
-        initializeComponents().catch(console.error);
-    }, [connection, getComponentsClient]);*/
 
     const updateFoodList = useCallback((section: any) => {
         const foodArray = section.food as any[];  
@@ -254,8 +229,11 @@ const App: React.FC = () => {
                 }
             }
         });
-        setFood(foodData); 
-        setVisibleFood(visibleFood);
+        if(foodData.length>0){
+            setFood(foodData);
+        }
+         
+        //setVisibleFood(visibleFood);
         //console.log(`food length: ${foodData.length}, visible food length: ${visibleFood.length}`);
     }, [setFood, screenSize, currentPlayer]);
 
@@ -315,42 +293,15 @@ const App: React.FC = () => {
             score: player.score,
             speed: player.speed,
             charging: 0,
-        } as Blob);
-        
-        /*const newCurrentPlayer = {
-            authority: player.authority,
-            x: player.x,
-            y: player.y,
-            radius: 4 + Math.sqrt(player.mass) * 6,
-            mass: player.mass,
-            score: player.score,
-            speed: player.speed,
-            charging: 0,
-        } as Blob;
-
-        const updateIntervals = 6; //9 
-        const delay = 8; //8 
-
-        for (let i = 0; i < updateIntervals; i++) {
-            setTimeout(() => {
-                setCurrentPlayer(currentPlayer => currentPlayer ? {
-                    ...currentPlayer,
-                    x: currentPlayer.x + ((newCurrentPlayer.x - currentPlayer.x) / updateIntervals),
-                    y: currentPlayer.y + ((newCurrentPlayer.y - currentPlayer.y) / updateIntervals),
-                } : newCurrentPlayer);
-            }, delay);
-        }*/
-
+            } as Blob);
     }, [setCurrentPlayer, playerKey, food]);
 
     useEffect(() => {
-        console.log('all players',allplayers)
         if(currentPlayer){
-        //console.log('all players',allplayers)
         updateLeaderboard(allplayers);
         const newVisiblePlayers: Blob[] = allplayers.reduce((accumulator: Blob[], playerx) => {
             if (currentPlayer && playerx.authority && currentPlayer.authority){
-                if(currentPlayer.authority != playerx.authority) {
+                if(currentPlayer.authority.toString() != playerx.authority.toString()) {
                 const halfWidth = screenSize.width / 2;
                 const halfHeight = screenSize.height / 2;
                 const diffX = (playerx.x - currentPlayer.x);
@@ -379,11 +330,8 @@ const App: React.FC = () => {
 
     const updateMap = useCallback((map: any) => {
         const playerArray = map.players as any[];
-        //console.log('players on map', playerArray);
-        //console.log('players on map', playerArray)
-        // Reduce the playerArray to a list of playerEntityIds
         const playerEntityIds = playerArray.map((player, index) => {
-            const seed = player.toString().substring(0, 7); //'player-' + index.toString(); //player.toString().substring(0, 20); // Limit the size of the seed
+            const seed = player.toString().substring(0, 7);
             const newPlayerEntityPda = FindEntityPda({
                 worldId: activeGames[0].worldId,
                 entityId: new anchor.BN(0),
@@ -392,28 +340,24 @@ const App: React.FC = () => {
             return newPlayerEntityPda;
         });
         
-        /*if(playerArray.length > 0){
+        if(playerArray.length > 0 && allplayers.length > 0){
             // filter allplayers for those not in playerArray
             setAllPlayers((prevPlayers) => {
             // Step 1: Filter out players from prevPlayers that are not in playerArray
             const filteredPlayers = prevPlayers.filter(prevPlayer =>
-                playerArray.some(player => player?.authority && prevPlayer?.authority && player.authority.equals(prevPlayer.authority))
+                playerArray.some(player => prevPlayer?.authority && player.toString() == prevPlayer.authority.toString())
             );
-    
             return filteredPlayers;
              });
             playerEntities.current = playerEntityIds;
-        }*/
-        if(playerArray.length > 0){
-        playerEntities.current = playerEntityIds;
+        }else{
+            playerEntities.current = playerEntityIds;
+            
         }
     }, [setPlayers, setCurrentPlayer, playerKey, food]);
 
     const updatePlayers = useCallback((player: any) => {
-        //console.log('updating players')
         if (currentPlayer && player && player.authority && currentPlayer.authority) {
-                //console.log(player)
-                //console.log('real', player)
                 setAllPlayers((prevPlayers) => {
                     const playerIndex = prevPlayers.findIndex(p => p.authority.equals(player.authority));
                     const newPlayer: Blob = {
@@ -439,84 +383,6 @@ const App: React.FC = () => {
             
         }
     }, [setAllPlayers, screenSize, currentPlayer]);
-    
-    /*const updatePlayers = useCallback((players: any) => {
-        let playersArray = players.players as any[];
-        updateLeaderboard(playersArray);
-        const currentPlayerData = playersArray.find(player => player.authority.equals(playerKey));
-        
-        if (!currentPlayerData) {
-            setCurrentPlayer(null);
-            setPlayers([]);
-            setFood([]);
-            console.error("Player eaten, not in game.");
-            return;
-        }
-    
-        const updateIntervals = 6; //9 
-        const delay = 8; //8 
-    
-        const newCurrentPlayer = {
-            authority: currentPlayerData.authority,
-            x: currentPlayerData.x,
-            y: currentPlayerData.y,
-            radius: 4 + Math.sqrt(currentPlayerData.mass) * 6,
-            mass: currentPlayerData.mass,
-            score: currentPlayerData.score,
-            speed: currentPlayerData.speed,
-            charging: 0,
-        } as Blob;
-    
-        const newVisiblePlayers: Blob[] = playersArray.reduce((accumulator: Blob[], player) => {
-            if (!currentPlayer || !currentPlayer.authority.equals(player.authority)) {
-                const halfWidth = screenSize.width / 2;
-                const halfHeight = screenSize.height / 2;
-                const diffX = (player.x - currentPlayerData.x);
-                const diffY = (player.y - currentPlayerData.y);
-    
-                if (Math.abs(diffX) <= halfWidth && Math.abs(diffY) <= halfHeight) {
-                    accumulator.push({
-                        authority: player.authority,
-                        x: diffX + screenSize.width / 2,
-                        y: diffY + screenSize.height / 2,
-                        radius: 4 + Math.sqrt(player.mass) * 6,
-                        mass: player.mass,
-                        score: player.score,
-                        speed: player.speed,
-                        charging: 0,
-                    });
-                }
-            }
-            return accumulator;
-        }, []);
-    
-    
-        for (let i = 0; i < updateIntervals; i++) {
-            setTimeout(() => {
-                setCurrentPlayer(currentPlayer => currentPlayer ? {
-                    ...currentPlayer,
-                    x: currentPlayer.x + ((newCurrentPlayer.x - currentPlayer.x) / updateIntervals),
-                    y: currentPlayer.y + ((newCurrentPlayer.y - currentPlayer.y) / updateIntervals),
-                } : newCurrentPlayer);
-            
-                setPlayers(players => players.map((vp, index) => {
-                    const diffs = {
-                            x: (newVisiblePlayers[index].x - vp.x) / updateIntervals,
-                            y: (newVisiblePlayers[index].y - vp.y) / updateIntervals,
-                        };
-                    if (diffs) {
-                        return {
-                            ...vp,
-                            x: vp.x + diffs.x,
-                            y: vp.y + diffs.y,
-                        };
-                    }
-                    return vp;
-                }));
-            }, delay);
-        }
-    }, [setPlayers, setCurrentPlayer, playerKey, food]);*/
-    
     
     // Define callbacks function to handle account changes
     const handlePlayersComponentChange = useCallback((accountInfo: AccountInfo<Buffer>) => {
@@ -574,7 +440,6 @@ const App: React.FC = () => {
             }
             }   
 
-        //console.log('Subscribe to players changes')
         for (let i = 0; i < playerEntities.current.length; i++) {
         const playersComponenti = FindComponentPda({
             componentId: PLAYER_COMPONENT,
@@ -679,7 +544,7 @@ const App: React.FC = () => {
             await connection.confirmTransaction({ blockhash, lastValidBlockHeight, signature }, "processed");
 
             // Transaction was successful
-            console.log(`Transaction confirmed: ${signature}`);
+            //console.log(`Transaction confirmed: ${signature}`);
             setTransactionSuccess(`Transaction confirmed`);
             return signature;
         } catch (error) {
@@ -730,16 +595,8 @@ const App: React.FC = () => {
     /**
      * Create a new game transaction
      */
-    const newGameTx = useCallback(async (width: number, height: number, entry_fee: number, max_players: number, emit_type: number, emit_data: number, frozen: boolean) => {
+    const newGameTx = useCallback(async (width: number, height: number, entry_fee: number, max_players: number, emit_type: number, emit_data: number, frozen: boolean, game_name: string) => {
         if (!publicKey) throw new WalletNotConnectedError();
-
-        /*const registryPda = FindRegistryPda({programId: MAP_COMPONENT});
-        const initializeRegistryIx = createInitializeRegistryInstruction({
-          registry: registryPda,
-          payer: provider.wallet.publicKey,
-        });
-        const tx = new anchor.web3.Transaction().add(initializeRegistryIx);
-        await provider.sendAndConfirm(tx);*/
 
         const initNewWorld = await InitializeNewWorld({
             payer:  publicKey, //playerKey,
@@ -770,10 +627,8 @@ const App: React.FC = () => {
             { extraSeed: mapseed }
         )
         const transaction = new anchor.web3.Transaction().add(addMapEntityIx);
-        //entityMatch.current = addEntity.entityPda;
-        //gameId.current = addEntity.entityPda;
         
-        const seed = "11111111111111111111"; // There is a current limitation on the size of the seeds, will be increased
+        const seed = "11111111111111111111"; 
         const newfoodEntityPda = FindEntityPda({
             worldId: initNewWorld.worldId,
             entityId: new anchor.BN(0),
@@ -828,7 +683,7 @@ const App: React.FC = () => {
             ],
             systemId: INIT_GAME,
             args: {
-                name:"test",
+                name:game_name,
                 width: width,
                 height: height,
                 entry_fee: entry_fee,
@@ -842,19 +697,37 @@ const App: React.FC = () => {
           transaction.add(initComponent.transaction);
           transaction.add(initGame.transaction);
 
-        const signature = await submitTransactionUser(transaction); //await submitTransaction(initGame.transaction, "processed", false); // providerEphemeralRollup.sendAndConfirm(initGame.transaction);
+        const signature = await submitTransactionUser(transaction); //await submitTransaction(initGame.transaction, "processed", false);
+
+        const mapdelegateIx = createDelegateInstruction({
+        entity: newmapentityPda,
+        account: initMapIx.componentPda,
+        ownerProgram: MAP_COMPONENT,
+        payer: playerKey,
+        });
+        const maptx = new anchor.web3.Transaction().add(mapdelegateIx);
+        const fooddelegateIx = createDelegateInstruction({
+        entity: newfoodEntityPda,
+        account: initComponent.componentPda,
+        ownerProgram: FOOD_COMPONENT,
+        payer: playerKey,
+        });
+        maptx.add(fooddelegateIx);
+        const delsignature = await submitTransaction(maptx, "finalized", true); //provider.sendAndConfirm(playertx, [], { skipPreflight: true, commitment: 'finalized' }); 
+        console.log(
+            `Delegation signature: ${delsignature}`
+        );
+
         if (signature != null) {
             setCreatingGame(false);
-            const newGameInfo : ActiveGame = {worldId: initNewWorld.worldId, worldPda: initNewWorld.worldPda}
-            console.log('new game info', newGameInfo.worldId,newGameInfo.worldPda.toString(), newmapentityPda)
+            const newGameInfo : ActiveGame = {worldId: initNewWorld.worldId, worldPda: initNewWorld.worldPda, delegated: false, name: game_name, active_players: 0, max_players: max_players, size: width}
+            console.log('new game info', newGameInfo.worldId,newGameInfo.worldPda.toString())
             setNewGameCreated(newGameInfo);
             //entityMatch.current = newmapentityPda;
             const copiedActiveGameIds: ActiveGame[] = [...activeGames];
             copiedActiveGameIds.push(newGameInfo);  
             setActiveGames(copiedActiveGameIds);
-            console.log(newmapentityPda, newmapentityPda.toString());
-            //console.log(mapParsedData);
-            //(mapComponentClientTemp.account as any).maplite.fetch(newmapentityPda, "processed").then(updateMap);
+            //console.log(newmapentityPda, newmapentityPda.toString());
         }
     }, [playerKey, connection]);
     /**
@@ -863,7 +736,7 @@ const App: React.FC = () => {
     const joinGameTx = useCallback(async (selectGameId: ActiveGame) => {
         if (!playerKey) throw new WalletNotConnectedError();
         //if (!entityMatch.current) throw new WalletNotConnectedError(); 
-
+        setScreenSize({width:selectGameId.size, height:selectGameId.size});
         const gameInfo = selectGameId; 
 
         const mapseed = "origin"; // There is a current limitation on the size of the seeds, will be increased
@@ -884,26 +757,28 @@ const App: React.FC = () => {
         })
     
         //await subscribeToGame();
-        if(!delegationDone){
+        if(!gameInfo.delegated){
             const mapComponentPda = FindComponentPda({
                 componentId: MAP_COMPONENT,
                 entity: mapEntityPda,
             });
-            const mapdelegateIx = createDelegateInstruction({
+            /*const mapdelegateIx = createDelegateInstruction({
             entity: mapEntityPda,
             account: mapComponentPda,
             ownerProgram: MAP_COMPONENT,
             payer: playerKey,
             });
+            console.log('map', mapComponentPda.toString())
             const maptx = new anchor.web3.Transaction().add(mapdelegateIx);
             //const mapdelsignature = await submitTransaction(maptx, "processed", true); //provider.sendAndConfirm(maptx, [], { skipPreflight: true, commitment: 'finalized' }); 
             //console.log(
             //    `Delegation signature: ${mapdelsignature}`
-            //);
+            //); 
             const foodComponentPda = FindComponentPda({
                 componentId: FOOD_COMPONENT,
                 entity: foodEntityPda,
             });
+            console.log('food', foodComponentPda.toString())
             const fooddelegateIx = createDelegateInstruction({
             entity: foodEntityPda,
             account: foodComponentPda,
@@ -914,25 +789,23 @@ const App: React.FC = () => {
             const delsignature = await submitTransaction(maptx, "finalized", true); //provider.sendAndConfirm(playertx, [], { skipPreflight: true, commitment: 'finalized' }); 
             console.log(
                 `Delegation signature: ${delsignature}`
-            );
+            );*/
             
             //await subscribeToGame();
-            let seednum = 0;
+            /*let seednum = 0;
             console.log(playerEntities.current.length);
             const mapComponentClient= await getComponentsClient(MAP_COMPONENT);
             const mapacc = await providerEphemeralRollup.connection.getAccountInfo(
-            mapComponentPda
+            mapComponentPda, "processed"
             );
-            console.log(mapacc)
-            console.log(mapComponentClient)
             if(mapacc){
             const mapParsedData = mapComponentClient.coder.accounts.decode("maplite", mapacc.data);
             console.log(mapParsedData);
              seednum = mapParsedData.players.length;
-            }
+            }*/
             
             const playerseed = playerKey.toString().substring(0, 7); //'player-' +  seednum.toString(); // There is a current limitation on the size of the seeds, will be increased
-            console.log(playerseed)
+            //console.log(playerseed)
             const newplayerEntityPda =  FindEntityPda({
                 worldId: gameInfo.worldId,
                 entityId: new anchor.BN(0),
@@ -956,25 +829,26 @@ const App: React.FC = () => {
               });
              // const txSign = await provider.sendAndConfirm(initComponent.transaction);
               tx.add(initComponent.transaction);
-              const txSign = await submitTransaction(tx, "finalized", true); //await provider.sendAndConfirm(tx);
-              console.log()
+              //const txSign = await submitTransaction(tx, "confirmed", true); //await provider.sendAndConfirm(tx);
                 //playerEntityPda = newplayerEntityPda;
-                console.log(
-                    ` new player signature: ${txSign}`
-                );
+                //console.log(
+                //    ` new player signature: ${txSign}`
+                //);
 
                 const playerComponentPda = FindComponentPda({
                     componentId: PLAYER_COMPONENT,
                     entity: newplayerEntityPda,
                 });
+                //console.log('player', playerComponentPda.toString())
                 const playerdelegateIx = createDelegateInstruction({
                 entity: newplayerEntityPda,
                 account: playerComponentPda,
                 ownerProgram: PLAYER_COMPONENT,
                 payer: playerKey,
                 });
-                const playertx = new anchor.web3.Transaction().add(playerdelegateIx);
-                const playerdelsignature = await submitTransaction(playertx, "finalized", true); //provider.sendAndConfirm(playertx, [], { skipPreflight: true, commitment: 'finalized' }); 
+                //const playertx = new anchor.web3.Transaction().add(playerdelegateIx);
+                tx.add(playerdelegateIx)
+                const playerdelsignature = await submitTransaction(tx, "finalized", true); //provider.sendAndConfirm(playertx, [], { skipPreflight: true, commitment: 'finalized' }); 
                 console.log(
                     `Delegation signature: ${playerdelsignature}`
                 );
@@ -998,20 +872,45 @@ const App: React.FC = () => {
                 ],
                 systemId: JOIN_GAME,
               });
-              console.log(applySystem)
+              console.log(applySystem, playerKey.toString())
             const transaction = applySystem.transaction;
-            const signature = await providerEphemeralRollup.sendAndConfirm(applySystem.transaction);   //submitTransactionER(transaction, "processed", false); 
+            const {
+                context: { slot: minContextSlot },
+                value: { blockhash, lastValidBlockHeight }
+            } = await providerEphemeralRollup.connection.getLatestBlockhashAndContext();
+
+            if (!walletRef.current) {
+                throw new Error('Wallet is not initialized');
+            } 
+            transaction.recentBlockhash = blockhash;
+            transaction.feePayer = walletRef.current.publicKey;
+            transaction.sign(walletRef.current);
+            const signature = await providerEphemeralRollup.connection.sendRawTransaction(
+                transaction.serialize(), 
+                { skipPreflight: true } // We don't want to do preflight in most cases
+            );
+            //const signature = await providerEphemeralRollup.sendAndConfirm(applySystem.transaction);   
             console.log(signature)
             if (signature != null) {
+                //console.log(selectGameId.size, selectGameId.size)
+                //setScreenSize({width:selectGameId.size, height:selectGameId.size});
                 setGameId(mapEntityPda);
                 setDelegationDone(true);
+                setActiveGames(prevActiveGames => {
+                    const updatedGames = prevActiveGames.map(game =>
+                        game.worldId === gameInfo.worldId && game.worldPda.toString() === gameInfo.worldPda.toString()
+                            ? { ...game, delegated: true }
+                            : game
+                    );
+                    return updatedGames;
+                });
                 entityMatch.current = mapEntityPda;
                 currentPlayerEntity.current = newplayerEntityPda;
-                foodEntities.current = [...foodEntities.current, foodEntityPda];
+                foodEntities.current = [foodEntityPda];
                 await subscribeToGame();
             }
         }else{
-            const playerseed = playerKey.toString().substring(0, 7); //'player-' +  seednum.toString(); // There is a current limitation on the size of the seeds, will be increased
+            const playerseed = playerKey.toString().substring(0, 7);
             console.log(playerseed)
             const newplayerEntityPda =  FindEntityPda({
                 worldId: gameInfo.worldId,
@@ -1036,14 +935,29 @@ const App: React.FC = () => {
                 ],
                 systemId: JOIN_GAME, 
               });
-            const transaction = applySystem.transaction;
-            const signature = await submitTransactionER(transaction, "processed", false); //providerEphemeralRollup.sendAndConfirm(applySystem.transaction); 
+              const transaction = applySystem.transaction;
+              const {
+                  context: { slot: minContextSlot },
+                  value: { blockhash, lastValidBlockHeight }
+              } = await providerEphemeralRollup.connection.getLatestBlockhashAndContext();
+  
+              if (!walletRef.current) {
+                  throw new Error('Wallet is not initialized');
+              } 
+              transaction.recentBlockhash = blockhash;
+              transaction.feePayer = walletRef.current.publicKey;
+              transaction.sign(walletRef.current);
+              const signature = await providerEphemeralRollup.connection.sendRawTransaction(
+                  transaction.serialize(), 
+                  { skipPreflight: true } // We don't want to do preflight in most cases
+              );
+            //const signature = await submitTransactionER(transaction, "processed", false); //providerEphemeralRollup.sendAndConfirm(applySystem.transaction); 
             if (signature != null) {
+                await subscribeToGame();
+                currentPlayerEntity.current = newplayerEntityPda;
+                foodEntities.current = [foodEntityPda];
                 setGameId(mapEntityPda);
                 entityMatch.current = mapEntityPda;
-                currentPlayerEntity.current = newplayerEntityPda;
-                foodEntities.current = [...foodEntities.current, foodEntityPda];
-                await subscribeToGame();
             }
         }
     }, [playerKey, submitTransaction, subscribeToGame]);
@@ -1068,11 +982,26 @@ const App: React.FC = () => {
             systemId: EXIT_GAME,
         });
         const transaction = applySystem.transaction;
+        const {
+            context: { slot: minContextSlot },
+            value: { blockhash, lastValidBlockHeight }
+        } = await providerEphemeralRollup.connection.getLatestBlockhashAndContext();
+
+        if (!walletRef.current) {
+            throw new Error('Wallet is not initialized');
+        } 
+        transaction.recentBlockhash = blockhash;
+        transaction.feePayer = walletRef.current.publicKey;
+        transaction.sign(walletRef.current);
         console.log('exiting')
         currentPlayerEntity.current = null;
         entityMatch.current = null;
         setGameId(null);
-        const signature = await submitTransactionER(transaction, "processed", false);  //providerEphemeralRollup.sendAndConfirm(transaction); 
+        const signature = await providerEphemeralRollup.connection.sendRawTransaction(
+            transaction.serialize(), 
+            { skipPreflight: true } // We don't want to do preflight in most cases
+        );
+        //const signature = await submitTransactionER(transaction, "processed", false);  //providerEphemeralRollup.sendAndConfirm(transaction); 
         console.log(signature)
         if (signature != null) {
             entityMatch.current = null;
@@ -1122,138 +1051,74 @@ const App: React.FC = () => {
     }, [playerKey, submitTransaction, subscribeToGame]);
 
     useEffect(() => {
+        const cleanUp = async () => {
+            if (currentPlayer) {
+                if (
+                    currentPlayer.authority == null &&
+                    currentPlayer.score === 0 &&
+                    currentPlayer.mass === 0 &&
+                    currentPlayer.x === 50000 &&
+                    currentPlayer.y === 50000
+                ) {
+                    currentPlayerEntity.current = null;
+                    entityMatch.current = null;
+                    setGameId(null);
+                    setPlayers([]);
+                    setFood([]);
+
+                    if (mapComponentSubscriptionId?.current) {
+                        await providerEphemeralRollup.connection.removeAccountChangeListener(mapComponentSubscriptionId.current);
+                    }
+                    if (myplayerComponentSubscriptionId?.current) {
+                        await providerEphemeralRollup.connection.removeAccountChangeListener(myplayerComponentSubscriptionId.current);
+                    }
+                    if (foodComponentSubscriptionId?.current) {
+                        for (let i = 0; i < foodEntities.current.length; i++) {
+                            await providerEphemeralRollup.connection.removeAccountChangeListener(foodComponentSubscriptionId.current[i]);
+                        }
+                    }
+                    if (playersComponentSubscriptionId?.current) {
+                        for (let i = 0; i < playerEntities.current.length; i++) {
+                            await providerEphemeralRollup.connection.removeAccountChangeListener(playersComponentSubscriptionId.current[i]);
+                        }
+                    }
+                }
+            }
+        };
         if(currentPlayer){
+        /*if(currentPlayer.authority == null && currentPlayer.score == 0 && currentPlayer.mass == 0 && currentPlayer.x == 50000 && currentPlayer.y == 50000){
+            currentPlayerEntity.current = null;
+            entityMatch.current = null;
+            setGameId(null);
+        }*/
         const visibleFood = food.reduce<Food[]>((accumulator, foodItem) => {
             const diffX = foodItem.x - currentPlayer.x;
             const diffY = foodItem.y - currentPlayer.y;
-            //console.log(currentPlayer, diffX, diffY) 
             if (Math.abs(diffX) <= screenSize.width/2 && Math.abs(diffY) <= screenSize.height/2) {
               // Food is visible, adjust position
               accumulator.push({
                 x: foodItem.x - currentPlayer.x + screenSize.width/2,
                 y: foodItem.y - currentPlayer.y + screenSize.height/2
               });
-            }
+            } 
             return accumulator;
         }, []);
         setVisibleFood(visibleFood);
-        //console.log(`food length: ${food.length}, visible food length: ${visibleFood.length}`);
+        cleanUp();
+       // console.log(`food length: ${food.length}, visible food length: ${visibleFood.length}`);
         }
-    }, [food,currentPlayer]);
-
-    // Function to handle movement and charging
-    const handleMakeMoveTx = async () => {
-        if (playerKey && currentPlayer && currentPlayer.authority && entityMatch.current && gameId && currentPlayerEntity.current) {
-            try {
-                const startTime = performance.now(); // Capture start time
-                const entity = gameId as PublicKey;
-                let mouseX = mousePosition.x;
-                let mouseY = mousePosition.y;
-                //const newX = Math.floor(currentPlayer.x + mouseX - window.innerWidth / 2);
-                //const newY = Math.floor(currentPlayer.y + mouseY - window.innerHeight / 2);
-                const newX = Math.max(0, Math.min(screenSize.width, Math.floor(currentPlayer.x + mouseX - window.innerWidth / 2)));
-                const newY = Math.max(0, Math.min(screenSize.height, Math.floor(currentPlayer.y + mouseY - window.innerHeight / 2)));
-                
-                let foodtoeat = checkFoodDistances(visibleFood, screenSize);
-
-                const alltransaction = new anchor.web3.Transaction();
-
-                if(foodtoeat){
-                    const eatFoodTx = await ApplySystem({
-                        authority: playerKey,
-                        entities: [
-                                {
-                                entity: currentPlayerEntity.current,
-                                components: [{ componentId: PLAYER_COMPONENT }],
-                              },
-                              {
-                                entity: foodEntities.current[0],
-                                components: [{ componentId: FOOD_COMPONENT }],
-                              },
-                              {
-                                entity: entityMatch.current,
-                                components: [{ componentId: MAP_COMPONENT }],
-                              },
-                        ],
-                        systemId: EAT_FOOD,
-                    });
-                    
-                    alltransaction.add(eatFoodTx.transaction);
-                }
-                const makeMove = await ApplySystem({
-                    authority: playerKey,
-                    entities: [
-                      {
-                        entity: currentPlayerEntity.current,
-                        components: [{ componentId: PLAYER_COMPONENT }],
-                      },
-                      {
-                        entity: foodEntities.current[0],
-                        components: [{ componentId: FOOD_COMPONENT }],
-                      },
-                      {
-                        entity: entityMatch.current,
-                        components: [{ componentId: MAP_COMPONENT }],
-                      },
-                    ],
-                    systemId: MOVEMENT,
-                    args: {
-                        x: newX,
-                        y: newY,
-                        boost: isMouseDown,
-                    },
-                });
-                
-                let transaction = makeMove.transaction;
-                alltransaction.add(transaction);
-                const {
-                    context: { slot: minContextSlot },
-                    value: { blockhash, lastValidBlockHeight }
-                } = await providerEphemeralRollup.connection.getLatestBlockhashAndContext();
-    
-                if (!walletRef.current) {
-                    throw new Error('Wallet is not initialized');
-                }
-                alltransaction.recentBlockhash = blockhash;
-                alltransaction.feePayer = walletRef.current.publicKey;
-                alltransaction.sign(walletRef.current);
-                
-                setConfirmedXY(alltransaction);
-                
-            } catch (error) {
-                setIsSubmitting(false);
-                console.error("Failed to execute system or submit transaction:", error);
-            }
-        }
-    };
-    
-    /*useEffect(() => {
-        if (playerKey && !exitHovered && currentPlayer && currentPlayer.authority && entityMatch.current && gameId && currentPlayerEntity.current) {
-        const intervalId = setInterval(() => {
-            handleMakeMoveTx();
-        }, 20); //20 
-
-        return () => clearInterval(intervalId); // Cleanup interval on unmount
-       // handleMovementAndCharging();
-        }
-    }, [playerKey, gameId, entityMatch, currentPlayer, exitHovered]);*/
+        //console.log('current player', currentPlayer)
+    }, [currentPlayer]);
 
     // Function to handle movement and charging
     const handleMovementAndCharging = async () => {
         const processSessionEphemTransaction = async (
             transaction: anchor.web3.Transaction
         ): Promise<string> => {
-            //const startTime = performance.now();
-            //const endTime1 = performance.now();  // Capture end time
-            //const elapsedTime1 = endTime1 - startTime; // Calculate elapsed time
-            //console.log(`Latency: ${elapsedTime1} ms`);
             const signature = await providerEphemeralRollup.connection.sendRawTransaction(
                 transaction.serialize(), 
                 { skipPreflight: true } // We don't want to do preflight in most cases
             );
-            //const endTime = performance.now();  // Capture end time
-            //const elapsedTime = endTime - startTime; // Calculate elapsed time
-            //console.log(`Latency: ${elapsedTime} ms`);
             /*await waitSignatureConfirmation(
                 signature,
                 providerEphemeralRollup.connection,
@@ -1282,22 +1147,20 @@ const App: React.FC = () => {
                 );
             });
         };
-
+  
         if (playerKey && currentPlayer && currentPlayer.authority && entityMatch.current && gameId && currentPlayerEntity.current) {
             try {
                 //const startTime = performance.now(); // Capture start time
                 const entity = gameId as PublicKey;
                 let mouseX = mousePosition.x;
                 let mouseY = mousePosition.y;
-                //const newX = Math.floor(currentPlayer.x + mouseX - window.innerWidth / 2);
-                //const newY = Math.floor(currentPlayer.y + mouseY - window.innerHeight / 2);
                 const newX = Math.max(0, Math.min(screenSize.width, Math.floor(currentPlayer.x + mouseX - window.innerWidth / 2)));
                 const newY = Math.max(0, Math.min(screenSize.height, Math.floor(currentPlayer.y + mouseY - window.innerHeight / 2)));
                 
                 //console.log(mousePosition.x, mousePosition.y);
                 //console.log(currentPlayer.x, currentPlayer.y, newX, newY, entity);
                 let foodtoeat = checkFoodDistances(visibleFood, screenSize);
-                //let playerstoeat = checkPlayerDistances(players, screenSize);
+                let playerstoeat = checkPlayerDistances(players, screenSize);
 
                 const alltransaction = new anchor.web3.Transaction();
 
@@ -1323,13 +1186,14 @@ const App: React.FC = () => {
                     
                     alltransaction.add(eatFoodTx.transaction);
                 }
-                /*if(playerstoeat){
-                    const playerseed = playerstoeat.toString().substring(0, 7); //'player-' +  seednum.toString(); // There is a current limitation on the size of the seeds, will be increased
-                    const newplayerEntityPda =  FindEntityPda({
+                if(playerstoeat){
+                    const seed = playerstoeat.toString().substring(0, 7);
+                    console.log('eat player', playerstoeat, currentPlayer.mass)
+                    const newPlayerEntityPda = FindEntityPda({
                         worldId: activeGames[0].worldId,
                         entityId: new anchor.BN(0),
-                        seed: playerseed
-                    })
+                        seed: seed,
+                    });
                     const eatPlayerTx = await ApplySystem({
                         authority: playerKey,
                         entities: [
@@ -1338,7 +1202,7 @@ const App: React.FC = () => {
                                 components: [{ componentId: PLAYER_COMPONENT }],
                               },
                               {
-                                entity: newplayerEntityPda,
+                                entity: newPlayerEntityPda,
                                 components: [{ componentId: PLAYER_COMPONENT }],
                               },
                               {
@@ -1346,11 +1210,11 @@ const App: React.FC = () => {
                                 components: [{ componentId: MAP_COMPONENT }],
                               },
                         ],
-                        systemId: EAT_FOOD,
+                        systemId: EAT_PLAYER,
                     });
                     
                     alltransaction.add(eatPlayerTx.transaction);
-                }*/
+                }
                 const makeMove = await ApplySystem({
                     authority: playerKey,
                     entities: [
@@ -1402,31 +1266,68 @@ const App: React.FC = () => {
                 //         transaction.add(chargeSystem.transaction);
                 //     }
                 // }
-                //const startTime = performance.now(); // Capture start time
-                if(alltransaction){
+                //const startTime = performance.now(); // Capture start time*/
+                //if(confirmedXY){
+                //console.log(confirmedXY)
+                //const startTime = performance.now();  // Capture end time
+                
                 let signature = await processSessionEphemTransaction(alltransaction);
+                
                 /*let signature =  await providerEphemeralRollup.sendAndConfirm(alltransaction).catch((error) => {
                     throw error;
                 }); */
-                //await submitTransactionER(transaction, "processed", false); 
-                //console.log(`Movement signature: ${signature}, ${confirmedXY}`);
-                if (signature != null) {  
+                console.log(signature)
+                if (signature != null && gameId && entityMatch.current) {  
                     //const endTime = performance.now();  // Capture end time
                     //const elapsedTime = endTime - startTime; // Calculate elapsed time
                     //console.log(`Latency: ${elapsedTime} ms`);
-                    await subscribeToGame();
-                    /*const playersComponent = FindComponentPda({
+                    setIsSubmitting(false);
+                    setTransactionError(null);
+                    setTransactionSuccess(null);
+
+                    const myplayerComponent = FindComponentPda({
                         componentId: PLAYER_COMPONENT,
-                        entity: entityMatch.current,
+                        entity: currentPlayerEntity.current,
                     });
+                    
+                    //myplayerComponentSubscriptionId.current = providerEphemeralRollup.connection.onAccountChange(myplayerComponent, handleMyPlayerComponentChange, 'processed');
+                    (playersComponentClient.current?.account as any).player1.fetch(myplayerComponent, "processed").then(updateMyPlayer).catch((error: any) => {
+                        console.error("Failed to fetch account:", error);
+                     });
+                    for (let i = 0; i < foodEntities.current.length; i++) {
+                        const foodComponenti = FindComponentPda({
+                            componentId: FOOD_COMPONENT,
+                            entity: foodEntities.current[i],
+                        });
+                        (foodComponentClient.current?.account as any).section.fetch(foodComponenti, "processed").then(updateFoodList).catch((error: any) => {
+                            console.error("Failed to fetch account:", error);
+                         });
+                    }
+            
+                    for (let i = 0; i < playerEntities.current.length; i++) {
+                        const playersComponenti = FindComponentPda({
+                            componentId: PLAYER_COMPONENT,
+                            entity: playerEntities.current[i],
+                        });
+                        console.log( i, playerEntities.current[i]);
+                        console.log('player component', playersComponenti);
+                        (playersComponentClient.current?.account as any).player1.fetch(playersComponenti, "processed").then(updatePlayers).catch((error: any) => {
+                            console.error("Failed to fetch account:", error);
+                         });
+                    }    
+                    
+                    // Subscribe to grid changes
                     const mapComponent = FindComponentPda({
                         componentId: MAP_COMPONENT,
                         entity: entityMatch.current,
                     });
-                    (playersComponentClient.current?.account as any).players.fetch(playersComponent, "processed").then(updatePlayers);
-                    (mapComponentClient.current?.account as any).map.fetch(mapComponent, "processed").then(updateFoodList);*/
-                    //setConfirmedXY(null);
-                }
+                   // mapComponentSubscriptionId.current = providerEphemeralRollup.connection.onAccountChange(mapComponent, handleMapComponentChange, 'processed');
+                    (mapComponentClient.current?.account as any).maplite.fetch(mapComponent, "processed").then(updateMap).catch((error: any) => {
+                        console.error("Failed to fetch account:", error);
+                     });
+
+                    //console.log('post fetch', currentPlayer.x, currentPlayer.y);
+                //}
                 }
             } catch (error) {
                 setIsSubmitting(false);
@@ -1436,14 +1337,15 @@ const App: React.FC = () => {
     };
     
     useEffect(() => {
-        if (playerKey && !exitHovered && currentPlayer && currentPlayer.authority && entityMatch.current && gameId && currentPlayerEntity.current) {
+        //if (playerKey && !exitHovered && currentPlayer && currentPlayer.authority && entityMatch.current && gameId && currentPlayerEntity.current) {
         const intervalId = setInterval(() => {
-            handleMovementAndCharging();
-        }, 50); //20 
-
+            handleMovementAndCharging(); 
+        }, 55); 
+        
         return () => clearInterval(intervalId); // Cleanup interval on unmount
-       // handleMovementAndCharging();
-        }
+        
+        //handleMovementAndCharging();
+        //}
     }, [playerKey, gameId, entityMatch, currentPlayer, exitHovered]);
 
     const checkPlayerDistances = (visiblePlayers: Blob[], screenSize: { width: number, height: number }) => {
@@ -1467,132 +1369,6 @@ const App: React.FC = () => {
             const distance = Math.sqrt((food.x - centerX) ** 2 + (food.y - centerY) ** 2);
             return distance < 100;
         });
-    };
-    
-    /*const handleEating = async () => {
-        let foodtoeat = checkFoodDistances(visibleFood, screenSize);
-        let playerstoeat = checkFoodDistances(players, screenSize);
-        if(foodtoeat){
-            if (playerKey && currentPlayer && entityMatch.current && currentPlayerEntity.current) {
-            try {
-                const entity = gameId as PublicKey;
-                const makeMove = await ApplySystem({
-                    authority: playerKey,
-                    entities: [
-                            {
-                            entity: currentPlayerEntity.current,
-                            components: [{ componentId: PLAYER_COMPONENT }],
-                          },
-                          {
-                            entity: foodEntities.current[0],
-                            components: [{ componentId: FOOD_COMPONENT }],
-                          },
-                          {
-                            entity: entityMatch.current,
-                            components: [{ componentId: MAP_COMPONENT }],
-                          },
-                    ],
-                    systemId: EAT_FOOD,
-                });
-                
-                let transaction = makeMove.transaction;
-
-                let signature = await providerEphemeralRollup.sendAndConfirm(transaction).catch((error) => {
-                    throw error;
-                }); 
-                console.log('eating'); 
-            } catch (error) {
-                setIsSubmitting(false);
-                console.error("Failed to execute system or submit transaction:", error);
-            }
-        }
-        else{
-            console.log("no food");
-        }
-        }
-    };
-    
-    useEffect(() => {
-        const intervalId = setInterval(() => {
-            handleEating();
-        }, 73); //20 
-
-        return () => clearInterval(intervalId); // Cleanup interval on unmount
-    }, [playerKey, currentPlayer, entityMatch, gameId]); */
-
-    /*const getGameData = async () => {
-        await subscribeToGame();
-    }
-
-    useEffect(() => {
-        const intervalId = setInterval(() => {
-            if (currentPlayer) {
-                getGameData();
-            }
-        }, 10);
-
-        return () => clearInterval(intervalId);
-    }, [playerKey, currentPlayer, entityMatch, gameId]);*/
-
-    // Animation logic
-    const animateMovement = (
-            targetX: number,
-            targetY: number,
-            playerX: number,
-            playerY: number,
-            playerSpeed: number,
-            playerMass: number
-        ) => {
-        function calculateMovement(
-            targetX: number,
-            targetY: number,
-            playerX: number,
-            playerY: number,
-            playerSpeed: number,
-            playerMass: number
-        ) {
-            let dx = targetX - playerX;
-            let dy = targetY - playerY;
-            let dist = Math.sqrt(Math.pow(dx, 2) + Math.pow(dy, 2));
-            let deg = Math.atan2(dy, dx);
-        
-            let slowDown = 1.0;
-            if (playerSpeed <= 6.25) {
-                slowDown = Math.log(playerMass / 10.0) / 1.504 - 0.531;
-            }
-        
-            let deltaY = ((playerSpeed * Math.sin(deg)) / slowDown);
-            let deltaX = ((playerSpeed * Math.cos(deg)) / slowDown);
-            return { deltaX, deltaY };
-        }
-
-        const { deltaX, deltaY } = calculateMovement(targetX, targetY, playerX, playerY, playerSpeed, playerMass);
-        if (currentPlayer) {
-            //set copy input = playerX
-            currentPlayer.x += deltaX;
-            currentPlayer.y += deltaY;
-            setCurrentPlayer({ ...currentPlayer });
-        }
-        /*
-        let currentFrame = 0;
-
-        const FPS = 60;
-        const ANIMATION_DURATION = 80; // in milliseconds
-        const FRAMES = (ANIMATION_DURATION / 1000) * FPS;
-
-        const animate = () => {
-            if (confirmedXY && currentFrame < FRAMES) {
-                if (currentPlayer) {
-                    currentPlayer.x += deltaX / FRAMES;
-                    currentPlayer.y += deltaY / FRAMES;
-                    setCurrentPlayer({ ...currentPlayer });
-                }
-                currentFrame++;
-                requestAnimationFrame(animate);
-            }
-        };
-
-        animate();*/
     };
 
     useEffect(() => {
@@ -1635,7 +1411,7 @@ const App: React.FC = () => {
                 window.removeEventListener('mouseup', handleMouseUp);
             };
         }
-    }, [playerKey, gameId, entityMatch, currentPlayer]);  
+    }, [playerKey, gameId, entityMatch, currentPlayer, screenSize]);  
 
     useEffect(() => {
         if(gameId){ 
@@ -1703,7 +1479,7 @@ const App: React.FC = () => {
         // Call the function to translate the rectangle
         translateLargerRectangle();
         
-    }, [gameId, setGameId]);  
+    }, [gameId, setGameId, screenSize]);  
 
     // Function to send SOL
     async function sendSol(destWallet: PublicKey) {
@@ -1750,23 +1526,10 @@ const App: React.FC = () => {
           //  LAMPORTS_PER_SOL
           //);
           sendSol(walletRef.current.publicKey).catch(console.error);
-          //const balance = await connection.getBalance(walletRef.current.publicKey);
-          //console.log(playerKey?.toString(), balance) 
         };
     
         createWalletAndRequestAirdrop();
       }, []);
-      
-      /*useEffect(() => {
-        const getBalance = async () => {
-            if(playerKey){
-                const balance = await connection.getBalance(playerKey);
-                console.log(playerKey?.toString(), balance);
-            }
-        };
-    
-        getBalance();
-      }, []);*/
       
       useEffect(() => {
         const getTPS = async () => {
@@ -1799,10 +1562,13 @@ const App: React.FC = () => {
     
         fetchPrice();
         }, []);
-        useEffect(() => {
+
+        /*useEffect(() => {
             // Initialize openGameInfo with a list of false values
-            setOpenGameInfo(new Array(activeGameIds.length).fill(false));
-          }, [activeGameIds]);
+            if(activeGames.length != openGameInfo.length){
+                setOpenGameInfo(new Array(activeGames.length).fill(false));
+            }
+          }, [activeGames]);*/
 
         const handleClick = (index: number) => {
         setOpenGameInfo(prevState => {
@@ -1811,38 +1577,67 @@ const App: React.FC = () => {
             return newState;
         });
         };
+
+        useEffect(() => {
+            // Define an async function to handle the logic
+            const fetchAndLogMapData = async () => {
+                // Initialize openGameInfo with a list of false values
+        
+                for (let i = 0; i < activeGames.length; i++) {
+                    const mapseed = "origin"; // There is a current limitation on the size of the seeds, will be increased
+                    const mapEntityPda = FindEntityPda({
+                        worldId: activeGames[i].worldId,
+                        entityId: new anchor.BN(0),
+                        seed: mapseed
+                    });
+                    const mapComponentPda = FindComponentPda({
+                        componentId: MAP_COMPONENT,
+                        entity: mapEntityPda,
+                    });
+                    
+                    try {
+                        const mapComponentClient = await getComponentsClient(MAP_COMPONENT);
+                        const mapacc = await providerEphemeralRollup.connection.getAccountInfo(
+                            mapComponentPda, "processed"
+                        );
+                        if (mapacc) {
+                            const mapParsedData = mapComponentClient.coder.accounts.decode("maplite", mapacc.data);
+                            console.log(`Parsed Data for game ID ${activeGames[i].worldId}:`, mapParsedData);
+                            setActiveGames(prevActiveGames => {
+                                const updatedGames = prevActiveGames.map(game =>
+                                    game.worldId === activeGames[i].worldId && game.worldPda.toString() === activeGames[i].worldPda.toString()
+                                        ? { ...game, name: mapParsedData.name, active_players: mapParsedData.players.length, max_players: mapParsedData.maxPlayers, size: mapParsedData.width  } 
+
+                                        : game
+                                );
+                                return updatedGames;
+                            });
+                        } else {
+                            console.log(`No account info found for game ID ${activeGames[i].worldId}`);
+                        }
+                    } catch (error) {
+                        console.error(`Error fetching map data for game ID ${activeGames[i].worldId}:`, error);
+                    }
+                }
+            };
+
+            // Call the async function
+            fetchAndLogMapData();
+        
+            // Dependency array to trigger this effect whenever activeGameIds changes
+        }, [openGameInfo]);
+        
         useEffect(() => {
         const renderPanel = (buildViewer: number) => {
             switch (buildViewer) {
-              case 1:
-                return (
-                  <div className="panel" style={{ display: "flex", justifyContent: 'center', width: "100%", height: "100%", color:"white" }}>
-                    <div style={{ marginTop: "1vw", width: "60%" }}>
-                      <h1 style={{ marginTop: "2vw", marginBottom: "2vw", marginLeft: "1.5vw", fontFamily: "conthrax", fontSize: "36px" }}>Launch Your Game</h1>
-                      <p style={{ marginLeft: "1.5vw", fontFamily: "terminus", fontSize: "20px", width: "80%" }}>
-                          Deploy and customize your own Supersize game. <br /><br />
-                        <span style={{ opacity: "0.7" }}>
-                          Supersize is compatible with all SPL tokens. 
-                          Deploying a game generates a new Supersize world that lives forever and is owned by you. 
-                          Game deployment costs 0.2 sol. Your wallet receives 80% of all fees generated by your game.
-                        </span>
-                        <br /><br />
-                         <span className="free-play" style={{display:newGameCreated?'flex':'none', width: 'fit-content', padding:"10px", fontSize:"15px", marginTop:"1vh"}}>New Game ID: {newGameCreated?.worldId.toString()}</span>
-                      </p>
-                    </div>
-                    <div style={{ marginRight: "1.5vw", marginTop:"3vw" }}>
-                      <CreateGame initFunction={newGameTx} />
-                    </div>
-                  </div>
-                );
               case 2:
                 return (
                   <div className="panel" style={{ display: "flex", justifyContent: 'center', width: "100%", height: "100%", color:"white" }}>
                     <div style={{ marginTop: "2vw", width: "60%" }}>
                     <h1 style={{ margin: "2vw", marginLeft:"4vw", fontFamily: "conthrax", fontSize: "36px" }}>Earn Fees</h1>
                     <p style={{ marginLeft: "4vw", fontFamily: "terminus", fontSize: "20px", width: "80%" }}>
-                      A 1% protocol fee is charged on each Supersize buy-in. 80% of the protocol fee goes to the game owner, 
-                      20% goes to Supersize Inc. Fees accumulate in each game’s chosen SPL token.
+                      On Beta launch, Supersize will be playable using SPL tokens. For paid games, a fee will be charged on each Supersize buy-in. 
+                      The game owner will recieve the majority of these fees. Fees accumulate in each game’s chosen SPL token.
                     </p>
                     </div>
                     <img src={`${process.env.PUBLIC_URL}/Group6.png`} width="100vw" height="auto" alt="Image" style={{ width: "25vw",height: "25vw", marginRight:"1vw", alignSelf:"center" }}/>
@@ -1877,13 +1672,61 @@ const App: React.FC = () => {
                     </div>
                   </div>
                 );
+                case 5:
+                    return (
+                      <div className="panel" style={{ display: "flex", justifyContent: 'center', width: "100%", height: "100%", color:"white" }}>
+                        <div style={{ marginTop: "1vw", width: "60%" }}>
+                          <h1 style={{ marginTop: "2vw", marginBottom: "2vw", marginLeft: "1.5vw", fontFamily: "conthrax", fontSize: "36px" }}>Launch Your Game</h1>
+                          <p style={{ marginLeft: "1.5vw", fontFamily: "terminus", fontSize: "20px", width: "80%" }}>
+                              Deploy and customize your own Supersize game. <br /><br />
+                            <span style={{ opacity: "0.7" }}>
+                              Supersize is compatible with all SPL tokens. 
+                              Deploying a game generates a new Supersize world that lives forever and is owned by you. 
+                              Game deployment costs 0.05 sol. Currently, games can only be deployed to devnet.
+                            </span>
+                            <br /><br />
+                             <span className="free-play" style={{display:newGameCreated?'flex':'none', width: 'fit-content', padding:"10px", fontSize:"15px", marginTop:"1vh"}}>New Game ID: {newGameCreated?.worldId.toString()}</span>
+                          </p>
+                        </div>
+                        <div style={{ marginRight: "1.5vw", marginTop:"3vw" }}>
+                          <CreateGame initFunction={newGameTx} />
+                        </div>
+                      </div>
+                    );
               default:
                 return null;
             }
         };
-    
+        
         setPanelContent(renderPanel(buildViewerNumber));
       }, [buildViewerNumber, newGameCreated]);
+
+      useEffect(() => {
+        console.log('buildViewerNumber:', buildViewerNumber); // Log the actual value of buildViewerNumber
+        const scrollableElement = document.querySelector('.info-text-container');
+        //console.log(scrollableElement);
+        if (!scrollableElement) return;
+        
+        const handleScroll = () => {
+          console.log('Scroll event triggered'); // Log when the scroll event is triggered
+      
+          const scrollPosition = scrollableElement.scrollTop / 20;
+          const image = document.querySelector('.info-spinning-image') as HTMLImageElement;
+
+          if (image) {
+            console.log('Image found:', image); // Log if the image element is found
+            image.style.transform = `rotate(${scrollPosition}deg)`;
+          } else {
+            console.log('Image not found');
+          }
+        };
+      
+        scrollableElement.addEventListener('scroll', handleScroll);
+      
+        return () => {
+            scrollableElement.removeEventListener('scroll', handleScroll);
+        };
+      }, [buildViewerNumber]);
 
       const [inputValue, setInputValue] = useState<string>('');  
       const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -1895,10 +1738,11 @@ const App: React.FC = () => {
               try {
                   const worldId = {worldId: new anchor.BN(inputValue.trim())};
                   const worldPda = await FindWorldPda( worldId);
-                  const newGameInfo : ActiveGame = {worldId: worldId.worldId, worldPda: worldPda}
+                  const newGameInfo : ActiveGame = {worldId: worldId.worldId, worldPda: worldPda, delegated: false, name: "test", active_players: 0, max_players: 0, size: 0}
                   console.log('new game info', newGameInfo.worldId,newGameInfo.worldPda.toString())
                   setNewGameCreated(newGameInfo);
                   setActiveGames([newGameInfo, ...activeGames]);
+                  setOpenGameInfo(new Array(activeGames.length).fill(false));
               } catch (error) {
                   console.error("Invalid PublicKey:", error);
               }
@@ -1909,59 +1753,127 @@ const App: React.FC = () => {
             handleImageClick();
         }
     };
+
+    const [footerVisible, setFooterVisible] = useState(false);
+    
+    useEffect(() => {
+        let scrollY = 0;
+        if(buildViewerNumber == 0 || buildViewerNumber == 1){
+        const handleWheel = (event: WheelEvent) => {
+          scrollY += event.deltaY;
+      
+          if (scrollY > 50) {
+            console.log('User has scrolled more than 100 pixels down.');
+            // Add your logic here
+            setbuildViewerNumber(1);
+          } else if (scrollY < -50) {
+            console.log('User has scrolled more than 100 pixels up.');
+            setbuildViewerNumber(0);
+            // Add your logic here
+          }
+        };
+      
+        window.addEventListener('wheel', handleWheel);
+      
+        // Cleanup the event listener on component unmount
+        return () => {
+          window.removeEventListener('wheel', handleWheel);
+        };
+        }
+      }, [buildViewerNumber]);
+
+    useEffect(() => {
+      const handleScroll = () => {
+        const element = document.querySelector('.info-text-container');
+        if (element) {
+          const scrollTop = element.scrollTop;
+          const scrollHeight = element.scrollHeight;
+          const clientHeight = element.clientHeight;
+          if (scrollTop + clientHeight >= scrollHeight) {
+            setFooterVisible(true);
+          } else {
+            setFooterVisible(false);
+          }
+        }
+      };
+  
+      const element = document.querySelector('.info-text-container');
+      if (element) {
+        element.addEventListener('scroll', handleScroll);
+      }
+  
+      return () => {
+        if (element) {
+          element.removeEventListener('scroll', handleScroll);
+        }
+      };
+    }, [buildViewerNumber]);
+    
     return (
+        <>
         <div className="supersize">
-        <div className="topbar" style={{display: gameId == null ? 'flex' : 'none'}}>
+        <div className="topbar" style={{display: gameId == null ? 'flex' : 'none',background: buildViewerNumber==1 ? "rgba(0, 0, 0, 0.3)" : "rgb(0, 0, 0)",height: buildViewerNumber==1 ? "10vh" : "4vh"}}>
             {/*<img src={`${process.env.PUBLIC_URL}/supersizemaybe.png`} width="75" height="75" alt="Image"/>*/}
             {/*<h1 className="titleText"> SUPERSIZE </h1>
             <Button buttonClass="mainButton" title={"Docs"} onClickFunction={openDocs} args={[]}/>  
             <Button buttonClass="mainButton" title={"New Game"} onClickFunction={runCreatingGame} args={[]}/>  
             <Button buttonClass="mainButton" title={"New Game"} onClickFunction={newGameTxOG} args={[]}/> */} 
-            {buildViewerNumber == 0 ? (<span className="free-play" style={{color:"#FFEF8A", borderColor:"#FFEF8A"}}>DEMO MODE</span>) : 
+            {buildViewerNumber == 0 ? (<span className="free-play" style={{color:"#FFEF8A", borderColor:"#FFEF8A", marginLeft:"auto", marginRight:"auto", width:"fit-content", paddingLeft:"10px", paddingRight:"10px", marginTop:"4vh"}}>Supersize is an eat or be eaten multiplayer game, live on the Solana blockchain</span>) : 
                (
+                <div>
                 <>
-               <div
-                style={{
-                    width: '4vh',
-                    height: '4vh',
-                    display: 'flex',
-                    cursor: "pointer",
-                    alignItems : "center", 
-                    justifyContent:"center",
-                    marginLeft:"2vw",
-                }}
-                onMouseEnter={() => setIsHovered([false,false,false,false,false,true])}
-                onMouseLeave={() => setIsHovered([false,false,false,false,false,false])}
-                onClick={() => setbuildViewerNumber(0)}
-                >
-                <img
-                    src={`${process.env.PUBLIC_URL}/home.png`}
-                    width="35px"
-                    height="auto"
-                    alt="Image"
-                    style={{
-                        position: "absolute",
-                        opacity: isHovered[5] ? 0.2 : 0.8,
-                        transition: 'opacity 0.0s ease background 0.3s ease 0s, color 0.3s ease 0s',
-                    }}
-                />
-                {isHovered[5] && (
-                    <img
-                    src={`${process.env.PUBLIC_URL}/homehighlight.png`}
-                    width="35px"
-                    height="auto"
-                    alt="Highlighted Image"
-                    style={{
-                        position: 'absolute',
-                        opacity: isHovered[5] ? 0.8 : 0.2,
-                        transition: 'opacity 0.3s ease',
-                    }}
-                    />
-                )}
-                </div>
-                </>)
+                    {buildViewerNumber ==1 ?
+                        (   
+                             <span className="titleText" style={{cursor:"pointer"}} onClick={(e) => {e.stopPropagation(); setbuildViewerNumber(0);}}> SUPERSIZE </span>
+                        ) : (        
+                        <div>
+                        <>
+                        <div
+                            style={{
+                                width: '4vh',
+                                height: '4vh',
+                                display: 'flex',
+                                cursor: "pointer",
+                                alignItems : "center", 
+                                justifyContent:"center",
+                                marginLeft:"2vw",
+                                marginTop:"4vh"
+                            }}
+                            onMouseEnter={() => setIsHovered([false,false,false,false,false,true])}
+                            onMouseLeave={() => setIsHovered([false,false,false,false,false,false])}
+                            onClick={() => {setbuildViewerNumber(0); setIsHovered([false,false,false,false,false]);}}
+                            >
+                            <img
+                                src={`${process.env.PUBLIC_URL}/home.png`}
+                                width="35px"
+                                height="auto"
+                                alt="Image"
+                                style={{
+                                    position: "absolute",
+                                    opacity: isHovered[5] ? 0.2 : 0.8,
+                                    transition: 'opacity 0.0s ease background 0.3s ease 0s, color 0.3s ease 0s',
+                                }}
+                            />
+                            {isHovered[5] && (
+                                <img
+                                src={`${process.env.PUBLIC_URL}/homehighlight.png`}
+                                width="35px"
+                                height="auto"
+                                alt="Highlighted Image"
+                                style={{
+                                    position: 'absolute',
+                                    opacity: isHovered[5] ? 0.8 : 0.2,
+                                    transition: 'opacity 0.3s ease',
+                                }}
+                                />
+                            )}
+                        </div>
+                        </>
+                        </div>)}
+                    </>
+                </div>)
             }
-            <div className="left-side" style={{display:"flex", alignItems : "center", justifyContent:"center"}}>
+            <div className="left-side" style={{alignItems : "center", justifyContent:"center", display: buildViewerNumber == 0 ? 'none' : 'flex' }}>
             <div
                 style={{
                     width: '45px',
@@ -2001,9 +1913,17 @@ const App: React.FC = () => {
                     />
                 )}
             </div>
-            <div className="wallet-buttons">
+            <>
+            {buildViewerNumber != 1 ? (
+                <div className="wallet-buttons" style={{ marginTop:"0vh"}}>
                 <WalletMultiButton />
-            </div>
+                </div>
+            ):(
+                <div className="play" style={{display: footerVisible ? "none" : 'flex'}}>
+                <Button buttonClass="playButton" title={"Play"} onClickFunction={joinGameTx} args={[activeGames[0]]}/>
+                </div>
+            )}
+            </>
             </div>
         </div>
         <>
@@ -2013,7 +1933,7 @@ const App: React.FC = () => {
         <>
         <div className="game-select" style={{display: gameId == null ? 'flex' : 'none', height: '86vh'}}>
             <div className="select-background">
-            <img src={`${process.env.PUBLIC_URL}/token.png`} width="30vw" height="auto" alt="Image" style={{position: 'relative', width: "30vw", height: 'auto',top:'-8vw',left:'-11vw', opacity:"0.3", 'zIndex': '-1'}}/>
+            <img src={`${process.env.PUBLIC_URL}/token.png`} width="30vw" height="auto" alt="Image" style={{position: 'relative', width: "30vw", height: 'auto',top:'-8vw',left:'-11vw', opacity:"0.3", 'zIndex': '-1', transform: "none"}}/>
             <h1 className="titleBackground"> SUPERSIZE </h1>
             </div>
             <div className="join-game">
@@ -2023,22 +1943,22 @@ const App: React.FC = () => {
                     </div>
                     <div className="gameSelect">
                         <div className="gameSelectButton" style={{maxHeight: expandlist ?  "25vh" : "auto", height: expandlist ? "25vh" : "auto"}}>
-                            <div style={{  display: "flex", flexDirection: "row", width:"100%", paddingBottom:"0.8vh", paddingTop:"0.8vh", borderBottom:"1px solid", background:"white", zIndex:"999", borderBottomLeftRadius: expandlist ? "0px" : "10px", borderBottomRightRadius: expandlist ? "0px" : "10px", borderTopLeftRadius: "10px", borderTopRightRadius:"10px", borderColor:"#5f5f5f"}}>
-                            <div onClick={() => {handleClick(0);}} style={{ width: "2vw", paddingTop:"0.8vh", alignItems: 'center', justifyContent: 'center', cursor: "pointer", alignSelf:"flex-start", display:"flex", marginLeft:"1vw", fontSize: "20px", fontWeight:"700" }}>
+                            <div style={{  display: "flex", flexDirection: "row", width:"100%", paddingBottom:"0.4em", paddingTop:"0.4em", borderBottom:"1px solid", background:"white", zIndex:"999", borderBottomLeftRadius: expandlist ? "0px" : "10px", borderBottomRightRadius: expandlist ? "0px" : "10px", borderTopLeftRadius: "10px", borderTopRightRadius:"10px", borderColor:"#5f5f5f"}}>
+                            <div onClick={() => {handleClick(0);}} style={{ width: "4vw", paddingTop:"0.4em", alignItems: 'center', justifyContent: 'center', cursor: "pointer", alignSelf:"flex-start", display:"flex", fontSize: "20px", fontWeight:"700" }}>
                             {!openGameInfo[0] ? "+" : "-"}
                             </div>
-                            <div className="gameInfo" style={{ marginLeft: "1vw", display: "flex", flexDirection: "column", fontSize:"1rem", paddingTop:"0.4vh", overflow:"hidden" }}>
+                            <div className="gameInfo" style={{ display: "flex", flexDirection: "column", fontSize:"1rem", paddingTop:"0.2em", overflow:"hidden", width:"100%" }}>
                                     <span style={{ opacity: "0.7", fontSize: "0.7rem", marginBottom:"5px" }}></span>
-                                    <span>Demo <p style={{opacity: "0.7", fontSize:"10px", display:"inline-flex"}}>[{activeGames[0].worldId.toString()}]</p></span>
+                                    <span>{activeGames[0].name} {/*<p style={{opacity: "0.7", fontSize:"10px", display:"inline-flex"}}>[demo]</p> */}</span>
                                     {openGameInfo[0] ? (
                                     <>
-                                    <span style={{ opacity: "0.7", fontSize: "0.7rem", marginBottom:"5px" }}>network: devnet </span>
-                                    <span style={{ opacity: "0.7", fontSize: "0.7rem", marginBottom:"5px" }}>max players: 10</span>
-                                    <span style={{ opacity: "0.7", fontSize: "0.7rem", marginBottom:"5px" }}>game size: 1500</span>
+                                    <span style={{ opacity: "0.7", fontSize: "0.7rem", marginBottom:"5px" }}>players: {activeGames[0].active_players} / {activeGames[0].max_players}</span>
+                                    <span style={{ opacity: "0.7", fontSize: "0.7rem", marginBottom:"5px" }}>game size: {activeGames[0].size}</span>
+                                    <span style={{ opacity: "0.7", fontSize: "0.7rem", marginBottom:"5px" }}>game id: {activeGames[0].worldId.toString()}</span>
                                     </>
                                     ): null}
                             </div>
-                            <div style={{marginLeft: "auto", width:"2vw", height:"3vh", paddingTop:"0.8vh", alignItems:'center', justifyContent:'flex-end', marginRight:"1vw", cursor: "pointer", display:"flex"}} onClick={(e) => {setexpandlist(!expandlist); setOpenGameInfo(new Array(activeGames.length).fill(false));}}>
+                            <div style={{marginLeft: "auto", width:"2vw", paddingTop:"0.8em", alignItems:'center', alignSelf:"flex-start",justifyContent:'flex-end', marginRight:"1vw", cursor: "pointer", display:"flex"}} onClick={(e) => {setexpandlist(!expandlist); setOpenGameInfo(new Array(activeGames.length).fill(false));}}>
                             <svg width="15" height="9" viewBox="0 0 10 6" fill="none" xmlns="http://www.w3.org/2000/svg" style={{width:"1vw", height:'auto', transform: expandlist ? "scaleY(-1)" : "scaleY(1)", transformOrigin: 'center'}}>
                             <path d="M5 6L9.33013 0H0.669873L5 6Z" fill="black"/>
                             </svg>
@@ -2049,25 +1969,25 @@ const App: React.FC = () => {
                             <div className="gameInfoContainer" style={{maxHeight: expandlist ? "20vh" : "auto", height: "20vh"}}>
                             {activeGames.map((item, index) => (
                             <>
-                            <div style={{  display: "flex", flexDirection: "row", width:"100%", paddingTop: "0.8vh",paddingBottom:!expandlist ?"0.8vh":"0.3vh", borderBottom:"1px solid", borderColor:"#5f5f5f", opacity:"0.5", cursor: "pointer"}}
+                            <div style={{  display: "flex", flexDirection: "row", width:"100%", paddingTop: "0.4em",paddingBottom:!expandlist ?"0.4em":"0.15em", borderBottom:"1px solid", borderColor:"#5f5f5f", opacity:"0.5", cursor: "pointer"}}
                                                             onMouseEnter={(e) => {e.currentTarget.style.background = '#FFEF8A'; e.currentTarget.style.opacity = '1.0';}}
                                                             onMouseLeave={(e) => {e.currentTarget.style.background = 'white'; e.currentTarget.style.opacity = '0.5';}}>  
-                            <div style={{width: "2vw", alignItems: 'center', justifyContent: 'center', cursor: "pointer", alignSelf:"flex-start", display: index == 0 ? 'flex' : 'flex' ,marginLeft: "1vw", marginTop:"0.7vh", fontSize: "20px", fontWeight:"700"}} onClick={() => {handleClick(index);}}>
+                            <div style={{width: "3.2vw", alignItems: 'center', justifyContent: 'center', cursor: "pointer", alignSelf:"flex-start", display: index == 0 ? 'flex' : 'flex' , marginTop:"0.7vh", fontSize: "20px", fontWeight:"700"}} onClick={() => {handleClick(index);}}>
                             {!openGameInfo[index] ? "+" : "-"}
                             </div>
-                            <div className="gameInfo" style={{ marginLeft: "1vw", display: "flex", flexDirection: "column", fontSize:"1rem", overflow:"hidden", marginBottom:"5px", marginTop:"0.3vh"  }} 
+                            <div className="gameInfo" style={{ display: "flex", flexDirection: "column", fontSize:"1rem", overflow:"hidden", marginBottom:"5px", marginTop:"0.15em", width:"100%" }} 
                             onClick={()=>{                                        
                                 const copiedActiveGameIds: ActiveGame[] = [...activeGames];
                                 const [item] = copiedActiveGameIds.splice(index, 1);
                                 copiedActiveGameIds.unshift(item);
                                 setActiveGames(copiedActiveGameIds);}}>
                                     <span style={{ opacity: "0.7", fontSize: "0.7rem", marginBottom:"5px" }}></span>
-                                    <span>Demo <p style={{opacity: "0.7", fontSize:"10px", display:"inline-flex"}}>[{item.worldId.toString()}]</p></span>
+                                    <span> {item.name} {/* <p style={{opacity: "0.7", fontSize:"10px", display:"inline-flex"}}>[demo]</p> */}</span>
                                     {openGameInfo[index] ? (
                                     <>
-                                    <span style={{ opacity: "0.7", fontSize: "0.7rem", marginBottom:"5px" }}>network: devnet </span>
-                                    <span style={{ opacity: "0.7", fontSize: "0.7rem", marginBottom:"5px" }}>max players: 10</span>
-                                    <span style={{ opacity: "0.7", fontSize: "0.7rem", marginBottom:"5px" }}>game size: 1500</span>
+                                    <span style={{ opacity: "0.7", fontSize: "0.7rem", marginBottom:"5px" }}>players: {item.active_players} / {item.max_players}</span>
+                                    <span style={{ opacity: "0.7", fontSize: "0.7rem", marginBottom:"5px" }}>game size: {item.size}</span>
+                                    <span style={{ opacity: "0.7", fontSize: "0.7rem", marginBottom:"5px" }}>game id: {item.worldId.toString()}</span>
                                     </>
                                     ): null}
                             </div>
@@ -2083,7 +2003,7 @@ const App: React.FC = () => {
                             </div>
                             <div className="searchbox" style={{marginTop: "auto"}}>
                                 <img src={`${process.env.PUBLIC_URL}/magnifying-glass.png`} width="20px" height="auto" alt="Image" style={{ marginLeft: "0.6vw", width: "1vw"}} onClick={handleImageClick} />
-                                <input type="text" className="text-input" placeholder="Search by name, token, or id" style={{background:"none", border:"none",marginRight:"1vw", height:"80%"}}
+                                <input type="text" className="text-input" placeholder="Search by game id" style={{background:"none", border:"none",marginRight:"1vw", height:"80%", width:"100%"}}
                                 value={inputValue}
                                 onChange={handleInputChange}
                                 onKeyDown={handleKeyPress}
@@ -2096,28 +2016,186 @@ const App: React.FC = () => {
                     <div className="play">
                         <Button buttonClass="playButton" title={"Play"} onClickFunction={joinGameTx} args={[activeGames[0]]}/>
                     </div>
+                    <div className="play">
+                        <Button buttonClass="createGameButton" title={"Create Game"} onClickFunction={() => setbuildViewerNumber(5)}/>
+                    </div>
                 </div>
             </div>
             
         </div>
         </>): (
-            <div className="game-select" style={{display: gameId == null ? 'flex' : 'none', height: '86vh', alignItems: 'center', justifyContent: 'center', flexDirection:'column'}}>
+            <>
+            {buildViewerNumber == 1 ? (
+            <div className="info-container" >
+            <div className="info-image-container" style={{display: footerVisible ? 'none' : 'flex', opacity: footerVisible ? "0" : "1", zIndex: "-1"}}>
+              <img src={`${process.env.PUBLIC_URL}/supersizemaybe.png`} alt="Spinning" className="info-spinning-image" />
+            </div>
+            <div className="info-text-container" style={{width: footerVisible ? '100%' : '65%', paddingLeft: footerVisible ? '0' : '20px',  paddingRight: footerVisible ? '0' : '6vw'}}>
+              <div className="info-scrolling-text">
+                ABOUT US:
+                <br></br>
+                <br></br>
+                <p>Supersize is a fully onchain feeding frenzy game. Players must eat or be eaten to become the biggest onchain. 
+                <br></br>
+                <br></br>
+                Bigger players move slower than smaller players, but can expend tokens to boost forward and eat them. Click to boost. Hold space to charge.
+                <br></br>
+                <br></br>
+                All game logic and state changes are recorded on Solana, in real-time, <br></br>powered by  {' '}
+                <a href="https://www.magicblock.gg/" target="_blank" rel="noopener noreferrer">
+                    <img src={`${process.env.PUBLIC_URL}/magicblock_white_copy.svg`} alt="Spinning" className="info-spinning-image" style={{width:"300px", marginTop:"50px", display:"inline-block"}}/>
+                </a>                
+                <br></br>
+                <br></br>
+                Once on mainnet, Supersize will be playable with any SPL token. Players can pay tokens to play and can exit the game to receive their score in tokens at any time. 
+                </p>
+                <div className={`info-footer ${footerVisible ? 'visible' : ''}`}>
+                <div style={{position:"absolute", top:"-50vh", left:"40vw", width:"fit-content", color: "white", fontFamily:"Terminus", fontSize:"0.5em", display:"flex", alignItems:"center", justifyContent:"center", flexDirection:"column"}}>
+                Join a game
+                <div className="play" style={{marginTop:"1vw"}}>
+                        <Button buttonClass="playNowButton" title={"Play Now"} onClickFunction={joinGameTx} args={[activeGames[0]]}/>
+                    </div>
+                </div>
+                <div className="footer-left">
+                <span className="footer-name"><div className="csupersize">© Supersize Inc. 2024</div></span>
+                </div>
+                <div className="footer-right">
+                <div
+                    style={{
+                        width: '35px',
+                        height: '40px',
+                        display: 'flex',
+                        cursor: "pointer",
+                        alignItems : "center", 
+                        justifyContent:"center",
+                        paddingLeft: "3px",
+                        paddingRight:"0px",
+                    }}
+                    onMouseEnter={() => setIsHovered([false,false,true,false,false])}
+                    onMouseLeave={() => setIsHovered([false,false,false,false,false])}
+                    onClick={openDocs}
+                    >
+                    <img
+                        src={`${process.env.PUBLIC_URL}/GitBook.png`}
+                        width="30px"
+                        height="auto"
+                        alt="Image"
+                        style={{
+                            position: "absolute",
+                            opacity: isHovered[2] ? 0.2 : 0.8,
+                            transition: 'opacity 0.0s ease background 0.3s ease 0s, color 0.3s ease 0s',
+                        }}
+                    />
+                    {isHovered[2] && (
+                        <img
+                        src={`${process.env.PUBLIC_URL}/GitBookhighlight.png`}
+                        width="30px"
+                        height="auto"
+                        alt="Highlighted Image"
+                        style={{
+                            position: 'absolute',
+                            opacity: isHovered[2] ? 0.8 : 0.2,
+                            transition: 'opacity 0.3s ease',
+                        }}
+                        />
+                    )}
+                </div>
+                <div
+                    style={{
+                        width: '35px',
+                        height: '40px',
+                        display: 'flex',
+                        cursor: "pointer",
+                        alignItems : "center", 
+                        justifyContent:"center",
+                        paddingLeft: "0px",
+                        paddingRight:"5px",
+                    }}
+                    onMouseEnter={() => setIsHovered([false,false,false,true,false])}
+                    onMouseLeave={() => setIsHovered([false,false,false,false,false])}
+                    onClick={openX}
+                    >
+                    <img
+                        src={`${process.env.PUBLIC_URL}/x-logo.png`}
+                        width="23px"
+                        height="auto"
+                        alt="Image"
+                        style={{
+                            position: "absolute",
+                            opacity: isHovered[3] ? 0.2 : 0.8,
+                            transition: 'opacity 0.0s ease background 0.3s ease 0s, color 0.3s ease 0s',
+
+                        }}
+                    />
+                    {isHovered[3] && (
+                        <img
+                        src={`${process.env.PUBLIC_URL}/x-logo-highlight.png`}
+                        width="23px"
+                        height="auto"
+                        alt="Highlighted Image"
+                        style={{
+                            position: 'absolute',
+                            opacity: isHovered[3] ? 0.8 : 0.2,
+                            transition: 'opacity 0.3s ease',
+                        }}
+                        />
+                    )}
+                </div>
+                </div>
+            </div>
+              </div>
+            </div>
+          </div>
+            ):(
+                <div className="game-select" style={{display: gameId == null ? 'flex' : 'none', height: '86vh', alignItems: 'center', justifyContent: 'center', flexDirection:'column'}}>
                 <div className="buildViewer" style={{display:"flex", alignItems: 'center', justifyContent: 'center'}}>
                     {panelContent}
                  </div>
                 <div className="buildSelect">
-                <div className= {buildViewerNumber==1 ? "circleOn" : "circle"} onClick={() => setbuildViewerNumber(1)}></div><div className={buildViewerNumber==2 ? "circleOn" : "circle"} onClick={() => setbuildViewerNumber(2)}></div><div className={buildViewerNumber==3 ? "circleOn" : "circle"} onClick={() => setbuildViewerNumber(3)}></div><div className={buildViewerNumber==4 ? "circleOn" : "circle"} onClick={() => setbuildViewerNumber(4)}></div>
+                <div className= {buildViewerNumber==5 ? "circleOn" : "circle"} onClick={() => setbuildViewerNumber(5)}></div><div className={buildViewerNumber==2 ? "circleOn" : "circle"} onClick={() => setbuildViewerNumber(2)}></div><div className={buildViewerNumber==3 ? "circleOn" : "circle"} onClick={() => setbuildViewerNumber(3)}></div>
                 </div>
-            </div>
+                </div>
+            )}
+            </>
         )}
-        <div className="linksFooter" style={{display: gameId == null ? 'flex' : 'none', alignItems:"center",justifyContent:"center"}}>
+        <div className="linksFooter" style={{display: gameId == null  && buildViewerNumber !=1 ? 'flex' : 'none', alignItems:"center",justifyContent:"center"}}>
             <div style={{height: "40px", alignItems:"center",justifyContent:"center",display:"flex", padding:"10px", marginLeft:"2vw", color:"white", fontFamily:"terminus"}}>
                 <div className="tps">TPS: {currentTPS}</div>
                 <div className="solprice"><img src={`${process.env.PUBLIC_URL}/solana-logo.png`} width="20px" height="auto" alt="Image" style={{ width: "1vw", marginRight: "10px"}}/> ${Math.round(price)}</div>
                 {/*<div className="playercount">Active Players: 0</div>*/}
             </div>
+            <div
+            style={{
+                height: "40px",
+                position: "absolute",
+                alignItems: "center",
+                justifyContent: "center",
+                display: buildViewerNumber == 0 ? "flex" : 'none',
+                padding: "10px",
+                marginLeft: "auto",
+                marginRight: "auto",
+                color: "white",
+                fontFamily: "terminus",
+                flexDirection: "column",
+                cursor:"pointer"
+            }}
+            onClick={() => setbuildViewerNumber(1)}
+            >
+            Learn More
+            <img
+                src={`${process.env.PUBLIC_URL}/morearrow.png`}
+                width="20px"
+                height="auto"
+                alt="Image"
+                style={{
+                marginTop: "0vh",
+                animation: "bounce 2s infinite",
+                }}
+                onClick={() => setbuildViewerNumber(1)}
+            />
+            </div>
             <div className="solstats">
-                <div
+                {/*<div
                     style={{
                         width: '35px',
                         height: '40px',
@@ -2156,7 +2234,7 @@ const App: React.FC = () => {
                         }}
                         />
                     )}
-                </div>
+                    </div>*/}
                 <div
                     style={{
                         width: '35px',
@@ -2207,6 +2285,7 @@ const App: React.FC = () => {
                         justifyContent:"center",
                         paddingLeft: "0px",
                         paddingRight:"5px",
+                        borderRight: "1px solid #FFFFFF4D",
                     }}
                     onMouseEnter={() => setIsHovered([false,false,false,true,false])}
                     onMouseLeave={() => setIsHovered([false,false,false,false,false])}
@@ -2238,6 +2317,7 @@ const App: React.FC = () => {
                         />
                     )}
                 </div>
+                {/*
                 <div
                     style={{
                         width: '35px',
@@ -2276,7 +2356,7 @@ const App: React.FC = () => {
                         }}
                         />
                     )}
-                </div>
+                </div>*/}
                 <div className="csupersize">© Supersize Inc. 2024</div>
             </div>
         </div>
@@ -2331,7 +2411,7 @@ const App: React.FC = () => {
                 justifyContent: 'center',
                 alignItems: 'flex-end',
                 position: 'fixed',
-                bottom: '20px',
+                bottom: '120px',
                 left: 0,
                 width: '100%',
                 zIndex: 1000,
@@ -2344,6 +2424,7 @@ const App: React.FC = () => {
 
         {transactionSuccess && <Alert type="success" message={transactionSuccess} onClose={() => setTransactionSuccess(null) } />}
         </div>
+        </>
     );
 };
 

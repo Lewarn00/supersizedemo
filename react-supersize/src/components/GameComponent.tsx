@@ -24,9 +24,10 @@ interface GameComponentProps {
   currentPlayer: Blob | null;
   screenSize: { width: number; height: number };
   scale: number;
+  chargeStart: number;
 }
 
-const GameComponent: React.FC<GameComponentProps> = ({ gameId, players, visibleFood, currentPlayer, screenSize, scale }) => {
+const GameComponent: React.FC<GameComponentProps> = ({ gameId, players, visibleFood, currentPlayer, screenSize, scale, chargeStart }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [lastTime, setLastTime] = useState<number>(0);
 
@@ -45,7 +46,7 @@ const GameComponent: React.FC<GameComponentProps> = ({ gameId, players, visibleF
 
           // Draw players
           players.forEach(blob => {
-            drawPlayer(ctx, blob, scale);
+            drawPlayer(ctx, blob, scale, 0);
           });
 
           // Draw food
@@ -60,7 +61,7 @@ const GameComponent: React.FC<GameComponentProps> = ({ gameId, players, visibleF
               x: screenSize.width / 2,
               y: screenSize.height / 2,
             };
-            drawPlayer(ctx, centeredPlayer, scale);
+            drawPlayer(ctx, centeredPlayer, scale, chargeStart);
             drawBorder(ctx, currentPlayer, screenSize, scale);
           }
         }
@@ -68,24 +69,24 @@ const GameComponent: React.FC<GameComponentProps> = ({ gameId, players, visibleF
     }
   }, [gameId, players, visibleFood, currentPlayer, screenSize, scale]);
 
-  const drawPlayer = (ctx: CanvasRenderingContext2D, blob: Blob, scale: number) => {
+  const drawPlayer = (ctx: CanvasRenderingContext2D, blob: Blob, scale: number, chargeStart: number) => {
     // Determine glow intensity based on speed
     let glowSize = 0;
     let glowIntensity = 'rgba(19, 241, 149, 0)'; // Default no glow
-
-    if (blob.speed > 10) {
+   // console.log(Date.now()/1000 - blob.charging, blob.charging)
+    if (blob.speed > 10 || (Date.now()/1000 - blob.charging > 1 && blob.charging !=0)) {
         glowSize = 40 * scale; // Significant glow at speed 10
         glowIntensity = 'rgba(19, 241, 149, 0.5)';
     }
-    if (blob.speed > 15) {
+    if (blob.speed > 15 || (Date.now()/1000 - blob.charging > 2.3 && blob.charging !=0)) {
         glowSize = 70 * scale; // Brighter and bigger glow at speed 15
         glowIntensity = 'rgba(19, 241, 149, 0.7)';
     }
-    if (blob.speed > 20) {
+    if (blob.speed > 20 || (Date.now()/1000 - blob.charging > 3.6 && blob.charging !=0)) {
         glowSize = 100 * scale; // Even brighter and bigger glow at speed 20
         glowIntensity = 'rgba(19, 241, 149, 0.9)';
     }
-    if (blob.speed > 25) {
+    if (blob.speed > 25 || (Date.now()/1000 - blob.charging > 5 && blob.charging !=0)) {
         glowSize = 150 * scale; // Maximum glow at speed 25+
         glowIntensity = 'rgba(19, 241, 149, 1.0)';
     }

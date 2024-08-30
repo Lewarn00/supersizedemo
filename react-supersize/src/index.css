@@ -204,6 +204,22 @@ overflow: hidden;
   margin-top: -7vw;
 }
 
+.playerNameText {
+  outline: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: left;
+  font-size: 1rem;
+  border: none;
+  background-color: transparent;
+  font-family: 'Terminus';
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none; 
+}
 .playerName {
   background-color: #FFF;
   grid-column: span 3;

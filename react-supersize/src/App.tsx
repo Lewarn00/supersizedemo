@@ -123,6 +123,7 @@ const App: React.FC = () => {
     const [allFood, setAllFood] = useState<Food[][]>([]);
     const [visibleFood, setVisibleFood] = useState<Food[][]>([]);
     const [currentPlayer, setCurrentPlayer] = useState<Blob | null>(null);
+    const [currentPlayerOnchain, setCurrentPlayerOnchain] = useState<Blob | null>(null);
     const [creatingGame, setCreatingGame] = useState(false);
     const [playerName, setPlayerName] = useState("unnamed");
     const [delegationDone, setDelegationDone] = useState(false);
@@ -139,21 +140,18 @@ const App: React.FC = () => {
     const [transactionError, setTransactionError] = useState<string | null>(null);
     const [transactionSuccess, setTransactionSuccess] = useState<string | null>(null);
     const [activeGameIds, setActiveGameIds] = useState<PublicKey[]>([new PublicKey('4gc82J1Qg9vJh6BcUiTsP73NCCJNF66dvk4vcx9JP7Ri'),new PublicKey('uk8PU7wgRzrqhibkhwQzyfJ33BnvmAzRCbNNvfNWVVd')]); //new PublicKey('DS3511vmVxC4MQpiAQawsh8ZmRTy59KqeDRH9vqUcfvd')
-    const [activeGames, setActiveGames] = useState<ActiveGame[]>([{
-        worldId: new anchor.BN(1241),
-        worldPda: new PublicKey('6e4VUAHLDytuTM2dCs26gEPtxg4PzQWLdLjcgKbwdGDR'),
+    const [activeGames, setActiveGames] = useState<ActiveGame[]>([
+    {
+        worldId: new anchor.BN(1281),
+        worldPda: new PublicKey('Em4j55th1qUoZAyAMBFXDD7YfgL5AFHNQ2nsFndbydSp'),
         delegated: false,
     } as ActiveGame,
     {
-        worldId: new anchor.BN(1243),
-        worldPda: new PublicKey('9tq14RtKMJTE91DfGmZbe25bQGHPz5SG6kAzajEfknTC'),
+        worldId: new anchor.BN(1282),
+        worldPda: new PublicKey('9bf4kk9xXWFaBNm9eR37qz6SJC9RV1sb73GoDDpFi4Gk'),
         delegated: false,
     } as ActiveGame,
-    {
-        worldId: new anchor.BN(1242),
-        worldPda: new PublicKey('5XzSrVqD2CSBFttVmhZuesgoCsBZqe4pLmbKc4Hsipmc'),
-        delegated: false,
-    } as ActiveGame]);
+    ]);
     const [openGameInfo, setOpenGameInfo] = useState<boolean[]>(new Array(activeGames.length).fill(false));
     let entityMatch = useRef<PublicKey | null>(null);
     let playerEntities = useRef<PublicKey[]>([]);
@@ -249,7 +247,7 @@ const App: React.FC = () => {
             //overwrite newfood[section index]
             //flatten for ui
             setFood(foodData);
-            console.log(food_index, foodData.length)
+            //console.log(food_index, foodData.length)
             setAllFood((prevAllFood) => {
                 return prevAllFood.map((foodArray, index) =>
                 food_index === index ? foodData : foodArray
@@ -314,6 +312,7 @@ const App: React.FC = () => {
     const updateMyPlayer = useCallback((player: any) => {
         if (!player) {
             setCurrentPlayer(null);
+            setCurrentPlayerOnchain(null);
             setPlayers([]);
             setFood([]);
             setAllFood([]);
@@ -321,7 +320,7 @@ const App: React.FC = () => {
             console.error("Player eaten, not in game.");
             return;
         }
-        //console.log(player)
+        //console.log(player.x, player.y)
         if(!currentPlayer){
         if(player.chargeStart){
             //console.log(player.chargeStart, Date.now()-player.chargeStart);
@@ -335,6 +334,16 @@ const App: React.FC = () => {
                 speed: player.speed,
                 charging: player.chargeStart,
                 } as Blob);
+                setCurrentPlayerOnchain({  
+                    authority: player.authority,
+                    x: player.x,
+                    y: player.y,
+                    radius: 4 + Math.sqrt(player.mass) * 6,
+                    mass: player.mass,
+                    score: player.score,
+                    speed: player.speed,
+                    charging: player.chargeStart,
+                    } as Blob);
         }else{
             setCurrentPlayer({  
                 authority: player.authority,
@@ -346,9 +355,40 @@ const App: React.FC = () => {
                 speed: player.speed,
                 charging: 0,
                 } as Blob);
+                setCurrentPlayerOnchain({  
+                    authority: player.authority,
+                    x: player.x,
+                    y: player.y,
+                    radius: 4 + Math.sqrt(player.mass) * 6,
+                    mass: player.mass,
+                    score: player.score,
+                    speed: player.speed,
+                    charging: player.chargeStart,
+                    } as Blob);
         }
+        }else{
+            setCurrentPlayer({  
+                authority: player.authority,
+                x: player.x,
+                y: player.y,
+                radius: 4 + Math.sqrt(player.mass) * 6,
+                mass: player.mass,
+                score: player.score,
+                speed: player.speed,
+                charging: 0,
+                } as Blob);
+            setCurrentPlayerOnchain({  
+                authority: player.authority,
+                x: player.x,
+                y: player.y,
+                radius: 4 + Math.sqrt(player.mass) * 6,
+                mass: player.mass,
+                score: player.score,
+                speed: player.speed,
+                charging: player.chargeStart,
+                } as Blob);
         }
-    }, [setCurrentPlayer, playerKey, food]);
+    }, [setCurrentPlayer,  setCurrentPlayerOnchain, playerKey, food]);
 
     useEffect(() => {
         if(currentPlayer){
@@ -409,7 +449,7 @@ const App: React.FC = () => {
             playerEntities.current = playerEntityIds;
             
         }
-    }, [setPlayers, setCurrentPlayer, playerKey, food]);
+    }, [setPlayers, setCurrentPlayer, setCurrentPlayerOnchain, playerKey, food]);
 
     const updatePlayers = useCallback((player: any) => {
         if (currentPlayer && player && player.authority && currentPlayer.authority) {
@@ -861,7 +901,7 @@ const App: React.FC = () => {
         for (let i = 1; i < selectGameId.max_players / 2; i++) {
             // Convert the loop index to a padded string of 'i's
             const foodseed = i.toString().repeat(20);
-            console.log(foodseed)
+            //console.log(foodseed)
             const foodEntityPda =  FindEntityPda({
                 worldId: gameInfo.worldId,
                 entityId: new anchor.BN(0),
@@ -963,7 +1003,7 @@ const App: React.FC = () => {
                     `Delegation signature: ${playerdelsignature}`
                 );
 
-            console.log('join game', gameInfo.worldId.toString(), newplayerEntityPda.toString(), foodEntityPdas[targetfoodid].toString(),mapEntityPda.toString())
+            //console.log('join game', gameInfo.worldId.toString(), newplayerEntityPda.toString(), foodEntityPdas[targetfoodid].toString(),mapEntityPda.toString())
             const applySystem = await ApplySystem({
                 authority: playerKey,
                 entities: [
@@ -985,7 +1025,7 @@ const App: React.FC = () => {
                     name: playerName,
                 }, 
               });
-              console.log(applySystem, playerKey.toString())
+              //console.log(applySystem, playerKey.toString())
             const transaction = applySystem.transaction;
             const {
                 context: { slot: minContextSlot },
@@ -1283,7 +1323,7 @@ const App: React.FC = () => {
             return player; // Return updated player if needed
           };
 
-        if (playerKey && currentPlayer && currentPlayer.authority && entityMatch.current && gameId && currentPlayerEntity.current) {
+        if (currentPlayerOnchain && playerKey && currentPlayer && currentPlayer.authority && entityMatch.current && gameId && currentPlayerEntity.current) {
             try {
                 //const startTime = performance.now(); // Capture start time
                 const entity = gameId as PublicKey;
@@ -1291,11 +1331,30 @@ const App: React.FC = () => {
                 let mouseY = mousePosition.y;
                 const newX = Math.max(0, Math.min(screenSize.width, Math.floor(currentPlayer.x + mouseX - window.innerWidth / 2)));
                 const newY = Math.max(0, Math.min(screenSize.height, Math.floor(currentPlayer.y + mouseY - window.innerHeight / 2)));
+
+                const myplayerComponent = FindComponentPda({
+                    componentId: PLAYER_COMPONENT,
+                    entity: currentPlayerEntity.current,
+                });
+                
+                /*
+
                 const updatedPlayer = updatePlayerPosition(currentPlayer, newX, newY, isMouseDown);
+                const ablob: Blob = {
+                    name: currentPlayer.name,
+                    authority: currentPlayer.authority,
+                    x: (currentPlayerOnchain.x + updatedPlayer.x) / 2,
+                    y: (currentPlayerOnchain.y + updatedPlayer.y) / 2,
+                    radius: currentPlayer.radius,
+                    mass: currentPlayer.mass,
+                    score: currentPlayer.score,
+                    speed: currentPlayer.speed,
+                    charging: currentPlayer.charging,
+                };
                 setCurrentPlayer(updatedPlayer);
 
-                //console.log(mousePosition.x, mousePosition.y);
-                //console.log(currentPlayer.x, currentPlayer.y, newX, newY, entity);
+                */
+                
 
                 const alltransaction = new anchor.web3.Transaction();
 
@@ -1434,12 +1493,12 @@ const App: React.FC = () => {
                     setTransactionError(null);
                     setTransactionSuccess(null);
 
-                    const myplayerComponent = FindComponentPda({
-                        componentId: PLAYER_COMPONENT,
-                        entity: currentPlayerEntity.current,
-                    });
+                    //const myplayerComponent = FindComponentPda({
+                    //    componentId: PLAYER_COMPONENT,
+                    //    entity: currentPlayerEntity.current,
+                    //});
                     
-                    //myplayerComponentSubscriptionId.current = providerEphemeralRollup.connection.onAccountChange(myplayerComponent, handleMyPlayerComponentChange, 'processed');
+                    /*
                     (playersComponentClient.current?.account as any).player1.fetch(myplayerComponent, "processed").then(updateMyPlayer).catch((error: any) => {
                         console.error("Failed to fetch account:", error);
                      });
@@ -1456,7 +1515,17 @@ const App: React.FC = () => {
                           console.error("Failed to fetch account:", error);
                         });
                     }
+                    */
             
+                    // Subscribe to grid changes
+                    const mapComponent = FindComponentPda({
+                        componentId: MAP_COMPONENT,
+                        entity: entityMatch.current,
+                    });
+                    (mapComponentClient.current?.account as any).maplite.fetch(mapComponent, "processed").then(updateMap).catch((error: any) => {
+                        console.error("Failed to fetch account:", error);
+                     });
+
                     for (let i = 0; i < playerEntities.current.length; i++) {
                         const playersComponenti = FindComponentPda({
                             componentId: PLAYER_COMPONENT,
@@ -1468,17 +1537,6 @@ const App: React.FC = () => {
                             console.error("Failed to fetch account:", error);
                          });
                     }    
-                    
-                    // Subscribe to grid changes
-                    const mapComponent = FindComponentPda({
-                        componentId: MAP_COMPONENT,
-                        entity: entityMatch.current,
-                    });
-                   // mapComponentSubscriptionId.current = providerEphemeralRollup.connection.onAccountChange(mapComponent, handleMapComponentChange, 'processed');
-                    (mapComponentClient.current?.account as any).maplite.fetch(mapComponent, "processed").then(updateMap).catch((error: any) => {
-                        console.error("Failed to fetch account:", error);
-                     });
-
                     //console.log('post fetch', currentPlayer.x, currentPlayer.y);
                 //}
                 }
@@ -1493,7 +1551,7 @@ const App: React.FC = () => {
         //if (playerKey && !exitHovered && currentPlayer && currentPlayer.authority && entityMatch.current && gameId && currentPlayerEntity.current) {
         const intervalId = setInterval(() => {
             handleMovementAndCharging(); 
-        }, 55); 
+        }, 30); 
         
         return () => clearInterval(intervalId); // Cleanup interval on unmount
         
@@ -1797,7 +1855,7 @@ const App: React.FC = () => {
                         );
                         if (mapacc) {
                             const mapParsedData = mapComponentClient.coder.accounts.decode("maplite", mapacc.data);
-                            console.log(`Parsed Data for game ID ${activeGames[i].worldId}:`, mapParsedData);
+                            //console.log(`Parsed Data for game ID ${activeGames[i].worldId}:`, mapParsedData);
                             setActiveGames(prevActiveGames => {
                                 const updatedGames = prevActiveGames.map(game =>
                                     game.worldId === activeGames[i].worldId && game.worldPda.toString() === activeGames[i].worldPda.toString()
@@ -1896,7 +1954,7 @@ const App: React.FC = () => {
       }, [buildViewerNumber, newGameCreated]);
 
       useEffect(() => {
-        console.log('buildViewerNumber:', buildViewerNumber); // Log the actual value of buildViewerNumber
+        //console.log('buildViewerNumber:', buildViewerNumber); // Log the actual value of buildViewerNumber
         const scrollableElement = document.querySelector('.info-text-container');
         //console.log(scrollableElement);
         if (!scrollableElement) return;

@@ -123,6 +123,7 @@ const GameComponent: React.FC<GameComponentProps> = ({ gameId, players, visibleF
 
   const drawBorder = (ctx: CanvasRenderingContext2D, currentPlayer: Blob, screenSize: { width: number; height: number }, scale: number) => {
     const gameSize = screenSize.width;
+    //console.log(currentPlayer.x , currentPlayer.y )
     const offsetX = currentPlayer.x - screenSize.width / 2;
     const offsetY = currentPlayer.y - screenSize.height / 2;
 

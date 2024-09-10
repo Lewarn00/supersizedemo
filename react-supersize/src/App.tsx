@@ -133,7 +133,7 @@ const App: React.FC = () => {
     const [currentTPS, setCurrentTPS] = useState(0);
     const [price, setPrice] = useState(0);
     const [confirmedXY, setConfirmedXY] = useState<Transaction | null>(null);
-    const [queueXY, setQueueXY] = useState<Food[]>([]);
+    const [queueXY, setQueueXY] = useState<Food | null>(null);
     const scale = 1;
     const [screenSize, setScreenSize] = useState({width: 2000,height: 2000}); //530*3,300*3
     const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
@@ -363,7 +363,7 @@ const App: React.FC = () => {
                     mass: player.mass,
                     score: player.score,
                     speed: player.speed,
-                    charging: player.chargeStart,
+                    charging: 0,
                     } as Blob);
         }
         }else{
@@ -385,7 +385,7 @@ const App: React.FC = () => {
                 mass: player.mass,
                 score: player.score,
                 speed: player.speed,
-                charging: player.chargeStart,
+                charging: 0,
                 } as Blob);
         }
     }, [setCurrentPlayer,  setCurrentPlayerOnchain, playerKey, food]);
@@ -434,8 +434,8 @@ const App: React.FC = () => {
             });
             return newPlayerEntityPda;
         });
-        
-        if(playerArray.length > 0 && allplayers.length > 0){
+
+        if(playerArray.length > 0){
             // filter allplayers for those not in playerArray
             setAllPlayers((prevPlayers) => {
             // Step 1: Filter out players from prevPlayers that are not in playerArray
@@ -444,7 +444,42 @@ const App: React.FC = () => {
             );
             return filteredPlayers;
              });
+
+             /*
+             playerEntities.current.forEach((entityId, index) => {
+                // Check if entityId exists in playerEntities.current
+                //const exists = playerEntityIds.includes(entityId);
+                const playerIndex = playerEntityIds.findIndex(p => p.equals(entityId));
+                
+                if (playerIndex == -1) {
+                    // add listener 
+                    const playersComponenti = FindComponentPda({
+                        componentId: PLAYER_COMPONENT,
+                        entity: entityId,
+                    }); 
+                    if (playersComponentSubscriptionId && playersComponentSubscriptionId.current) providerEphemeralRollup.connection.removeAccountChangeListener(playersComponentSubscriptionId.current[playerIndex]);
+                } 
+              });
+              playerEntityIds.forEach((entityId) => {
+                // Check if entityId exists in playerEntities.current
+                //const exists = playerEntities.current.includes(entityId);
+                const playerIndex = playerEntities.current.findIndex(p => p.equals(entityId));
+                if (playerIndex == -1) {
+                    // add listener 
+                    const playersComponenti = FindComponentPda({
+                        componentId: PLAYER_COMPONENT,
+                        entity: entityId,
+                    }); 
+                    if (playersComponentSubscriptionId.current === null) {
+                        playersComponentSubscriptionId.current = [providerEphemeralRollup.connection.onAccountChange(playersComponenti, handlePlayersComponentChange, 'processed')];
+                    } else {
+                        playersComponentSubscriptionId.current = [...playersComponentSubscriptionId.current,providerEphemeralRollup.connection.onAccountChange(playersComponenti, handlePlayersComponentChange, 'processed')];
+                    }
+                } 
+              });*/
+              
             playerEntities.current = playerEntityIds;
+            //console.log(playerEntities.current, playersComponentSubscriptionId.current, foodComponentSubscriptionId.current)
         }else{
             playerEntities.current = playerEntityIds;
             
@@ -545,8 +580,8 @@ const App: React.FC = () => {
             componentId: PLAYER_COMPONENT,
             entity: playerEntities.current[i],
         });
-        //console.log( i, playerEntities.current[i]);
-        //console.log('player component', playersComponenti);
+        console.log( i, playerEntities.current[i]);
+        console.log('player component', playersComponenti);
         if (playersComponentSubscriptionId.current === null) {
             playersComponentSubscriptionId.current = [providerEphemeralRollup.connection.onAccountChange(playersComponenti, handlePlayersComponentChange, 'processed')];
         } else {
@@ -1025,7 +1060,6 @@ const App: React.FC = () => {
                     name: playerName,
                 }, 
               });
-              //console.log(applySystem, playerKey.toString())
             const transaction = applySystem.transaction;
             const {
                 context: { slot: minContextSlot },
@@ -1045,8 +1079,6 @@ const App: React.FC = () => {
             //const signature = await providerEphemeralRollup.sendAndConfirm(applySystem.transaction);   
             console.log(signature)
             if (signature != null) {
-                //console.log(selectGameId.size, selectGameId.size)
-                //setScreenSize({width:selectGameId.size, height:selectGameId.size});
                 setGameId(mapEntityPda);
                 setDelegationDone(true);
                 setActiveGames(prevActiveGames => {
@@ -1164,6 +1196,7 @@ const App: React.FC = () => {
         //const signature = await submitTransactionER(transaction, "processed", false);  //providerEphemeralRollup.sendAndConfirm(transaction); 
         console.log(signature)
         if (signature != null) {
+            playersComponentSubscriptionId.current = [];
             entityMatch.current = null;
             setGameId(null);
         }
@@ -1284,44 +1317,6 @@ const App: React.FC = () => {
                 );
             });
         };
-  
-        const updatePlayerPosition = (
-            player: Blob,
-            target_x: number,
-            target_y: number,
-            boosting: boolean,
-          ) => {
-            const player_x = player.x;
-            const player_y = player.y;
-          
-            const dx = target_x - player_x;
-            const dy = target_y - player_y;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-            const deg = Math.atan2(dy, dx);
-          
-            let slow_down = 1.0;
-            if (player.speed <= 6.25) {
-              slow_down = Math.log(player.mass / 10) / 1.504 - 0.531;
-            }
-          
-            if (boosting) {
-              player.speed = 12.0;
-            } else if (player.speed > 6.25) {
-              player.speed -= 0.5;
-            }
-          
-            const delta_y = (player.speed * 3.0 * Math.sin(deg)) / slow_down;
-            const delta_x = (player.speed * 3.0 * Math.cos(deg)) / slow_down;
-          
-            player.y = Math.round(player_y + delta_y);
-            player.x = Math.round(player_x + delta_x);
-          
-            // Ensure player position is within map bounds
-            player.y = Math.max(0, Math.min(player.y, screenSize.height));
-            player.x = Math.max(0, Math.min(player.x, screenSize.width));
-          
-            return player; // Return updated player if needed
-          };
 
         if (currentPlayerOnchain && playerKey && currentPlayer && currentPlayer.authority && entityMatch.current && gameId && currentPlayerEntity.current) {
             try {
@@ -1336,25 +1331,6 @@ const App: React.FC = () => {
                     componentId: PLAYER_COMPONENT,
                     entity: currentPlayerEntity.current,
                 });
-                
-                /*
-
-                const updatedPlayer = updatePlayerPosition(currentPlayer, newX, newY, isMouseDown);
-                const ablob: Blob = {
-                    name: currentPlayer.name,
-                    authority: currentPlayer.authority,
-                    x: (currentPlayerOnchain.x + updatedPlayer.x) / 2,
-                    y: (currentPlayerOnchain.y + updatedPlayer.y) / 2,
-                    radius: currentPlayer.radius,
-                    mass: currentPlayer.mass,
-                    score: currentPlayer.score,
-                    speed: currentPlayer.speed,
-                    charging: currentPlayer.charging,
-                };
-                setCurrentPlayer(updatedPlayer);
-
-                */
-                
 
                 const alltransaction = new anchor.web3.Transaction();
 
@@ -1384,28 +1360,6 @@ const App: React.FC = () => {
                     }
                 }
                 
-               /* if(foodtoeat){
-                    const eatFoodTx = await ApplySystem({
-                        authority: playerKey,
-                        entities: [
-                                {
-                                entity: currentPlayerEntity.current,
-                                components: [{ componentId: PLAYER_COMPONENT }],
-                              },
-                              {
-                                entity: foodEntities.current[0],
-                                components: [{ componentId: FOOD_COMPONENT }],
-                              },
-                              {
-                                entity: entityMatch.current,
-                                components: [{ componentId: MAP_COMPONENT }],
-                              },
-                        ],
-                        systemId: EAT_FOOD,
-                    });
-                    //console.log("eat attempt",eatFoodTx )
-                    alltransaction.add(eatFoodTx.transaction);
-                }*/
                 let playerstoeat = checkPlayerDistances(players, screenSize);
                 if(playerstoeat){
                     const seed = playerstoeat.toString().substring(0, 7);
@@ -1492,6 +1446,8 @@ const App: React.FC = () => {
                     setIsSubmitting(false);
                     setTransactionError(null);
                     setTransactionSuccess(null);
+                    //const targetXY : Food = {x: newX, y: newY}
+                    //setQueueXY(targetXY)
 
                     //const myplayerComponent = FindComponentPda({
                     //    componentId: PLAYER_COMPONENT,
@@ -1536,7 +1492,7 @@ const App: React.FC = () => {
                         (playersComponentClient.current?.account as any).player1.fetch(playersComponenti, "processed").then(updatePlayers).catch((error: any) => {
                             console.error("Failed to fetch account:", error);
                          });
-                    }    
+                    } 
                     //console.log('post fetch', currentPlayer.x, currentPlayer.y);
                 //}
                 }
@@ -1548,16 +1504,66 @@ const App: React.FC = () => {
     };
     
     useEffect(() => {
-        //if (playerKey && !exitHovered && currentPlayer && currentPlayer.authority && entityMatch.current && gameId && currentPlayerEntity.current) {
-        const intervalId = setInterval(() => {
+        /*const intervalId = setInterval(() => {
             handleMovementAndCharging(); 
         }, 30); 
         
-        return () => clearInterval(intervalId); // Cleanup interval on unmount
-        
-        //handleMovementAndCharging();
-        //}
-    }, [playerKey, gameId, entityMatch, currentPlayer]);
+        return () => clearInterval(intervalId); // Cleanup interval on unmount*/
+        handleMovementAndCharging(); 
+    }, [gameId, currentPlayer]);
+    
+    useEffect(() => {
+        const updatePlayerPosition = (
+            player: Blob,
+            target_x: number,
+            target_y: number,
+            boosting: boolean,
+          ) => {
+            const player_x = player.x;
+            const player_y = player.y;
+          
+            const dx = target_x - player_x;
+            const dy = target_y - player_y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            const deg = Math.atan2(dy, dx);
+          
+            let slow_down = 1.0;
+            if (player.speed <= 6.25) {
+              slow_down = Math.log(player.mass / 10) / 1.504 - 0.531;
+            }
+          
+            if (boosting) {
+              player.speed = 12.0;
+            } else if (player.speed > 6.25) {
+              player.speed -= 0.5;
+            }
+          
+            const delta_y = (player.speed * 3.0 * Math.sin(deg)) / slow_down;
+            const delta_x = (player.speed * 3.0 * Math.cos(deg)) / slow_down;
+
+            player.y = Math.round(player_y + delta_y / 2);
+            player.x = Math.round(player_x + delta_x / 2);
+
+            // Ensure player position is within map bounds
+            player.y = Math.max(0, Math.min(player.y, screenSize.height));
+            player.x = Math.max(0, Math.min(player.x, screenSize.width));
+            return player; // Return updated player if needed
+          };
+
+          if(currentPlayer){
+          setTimeout(() => {
+                let mouseX = mousePosition.x;
+                let mouseY = mousePosition.y;
+                const newX = Math.max(0, Math.min(screenSize.width, Math.floor(currentPlayer.x + mouseX - window.innerWidth / 2)));
+                const newY = Math.max(0, Math.min(screenSize.height, Math.floor(currentPlayer.y + mouseY - window.innerHeight / 2)));
+                //console.log(currentPlayer.x, currentPlayer.y)
+                const currentPlayerCopy = { ...currentPlayer };  // Create a shallow copy of currentPlayer
+                const updatedPlayer = updatePlayerPosition(currentPlayerCopy, newX, newY, isMouseDown);
+                setCurrentPlayerOnchain(updatedPlayer);
+                //console.log(currentPlayer.x, currentPlayer.y, updatedPlayer.x, updatedPlayer.y)
+        }, 30); 
+        }
+     }, [currentPlayer]);
 
     const checkPlayerDistances = (visiblePlayers: Blob[], screenSize: { width: number, height: number }) => {
         const centerX = screenSize.width / 2;
@@ -2637,31 +2643,11 @@ const App: React.FC = () => {
                 gameId={gameId}
                 players={players}
                 visibleFood={visibleFood.flat()}
-                currentPlayer={currentPlayer}
+                currentPlayer={currentPlayerOnchain}
                 screenSize={screenSize}
                 scale={scale}
                 chargeStart={chargeStart}
             />
-            {/*
-            {players.map((blob, index) => (
-                <PlayerEntity blob={blob} scale={scale}/>
-            ))}
-            {visibleFood.map((f, index) => (
-                <FoodEntity food={f} scale={scale}/>
-            ))}
-            {currentPlayer ? 
-                <PlayerEntity blob={{
-                authority: currentPlayer.authority,
-                x: screenSize.width / 2,
-                y: screenSize.height / 2,
-                radius: currentPlayer.radius,
-                mass: currentPlayer.mass,
-                score: currentPlayer.score,
-                speed: currentPlayer.speed,
-                charging: 0} as Blob}
-                scale={scale}/>
-            : null}
-            */}
         </div>
         </div>
         {isSubmitting && (

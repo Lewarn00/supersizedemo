@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {PublicKey} from "@solana/web3.js";
+const foodImage = new Image();
+foodImage.src = `${process.env.PUBLIC_URL}/coin.png`; // Update with your image path
 
 interface Blob {
     authority: PublicKey;
@@ -51,7 +53,7 @@ const GameComponent: React.FC<GameComponentProps> = ({ gameId, players, visibleF
 
           // Draw food
           visibleFood.forEach(food => {
-            drawFood(ctx, food, scale);
+            drawFood2(ctx, food, scale);
           });
 
           // Draw current player
@@ -119,6 +121,27 @@ const GameComponent: React.FC<GameComponentProps> = ({ gameId, players, visibleF
     ctx.fillStyle = 'white'; // Change color as needed
     ctx.fill();
     ctx.stroke();
+  };
+  const drawFood2 = (ctx: CanvasRenderingContext2D, food: Food, scale: number) => {
+    const diameter = 20 * scale; // The diameter of the circle which is used as the bounding box size
+  
+    if (foodImage.complete) {
+      // Draw the image within the bounding box of the circle
+      ctx.drawImage(
+        foodImage, 
+        food.x * scale - diameter / 2,  // Center the image on the food's x position
+        food.y * scale - diameter / 2,  // Center the image on the food's y position
+        diameter,                       // Width of the bounding box
+        diameter                        // Height of the bounding box
+      );
+    } else {
+      // Fallback to drawing a circle if the image is not loaded
+      ctx.beginPath();
+      ctx.arc(food.x * scale, food.y * scale, 10 * scale, 0, 2 * Math.PI); // Circle radius is 10 * scale
+      ctx.fillStyle = 'white';
+      ctx.fill();
+      ctx.stroke();
+    }
   };
 
   const drawBorder = (ctx: CanvasRenderingContext2D, currentPlayer: Blob, screenSize: { width: number; height: number }, scale: number) => {

@@ -142,13 +142,13 @@ const App: React.FC = () => {
     const [activeGameIds, setActiveGameIds] = useState<PublicKey[]>([new PublicKey('4gc82J1Qg9vJh6BcUiTsP73NCCJNF66dvk4vcx9JP7Ri'),new PublicKey('uk8PU7wgRzrqhibkhwQzyfJ33BnvmAzRCbNNvfNWVVd')]); //new PublicKey('DS3511vmVxC4MQpiAQawsh8ZmRTy59KqeDRH9vqUcfvd')
     const [activeGames, setActiveGames] = useState<ActiveGame[]>([
     {
-        worldId: new anchor.BN(1281),
-        worldPda: new PublicKey('Em4j55th1qUoZAyAMBFXDD7YfgL5AFHNQ2nsFndbydSp'),
+        worldId: new anchor.BN(1306),
+        worldPda: new PublicKey('DKJZtC5YaTY1ev5Ngi8fG22G3JzmMBDk3inutpqSK3Hj'),
         delegated: false,
     } as ActiveGame,
     {
-        worldId: new anchor.BN(1282),
-        worldPda: new PublicKey('9bf4kk9xXWFaBNm9eR37qz6SJC9RV1sb73GoDDpFi4Gk'),
+        worldId: new anchor.BN(1305),
+        worldPda: new PublicKey('FYhhJwfhXcUjFUK6Gda9m8ykaPqbtTmbCkhZhQa1quDd'),
         delegated: false,
     } as ActiveGame,
     ]);
@@ -247,7 +247,7 @@ const App: React.FC = () => {
             //overwrite newfood[section index]
             //flatten for ui
             setFood(foodData);
-            //console.log(food_index, foodData.length)
+            //console.log(food_index, foodData.length) 
             setAllFood((prevAllFood) => {
                 return prevAllFood.map((foodArray, index) =>
                 food_index === index ? foodData : foodArray
@@ -442,7 +442,7 @@ const App: React.FC = () => {
             const filteredPlayers = prevPlayers.filter(prevPlayer =>
                 playerArray.some(player => prevPlayer?.authority && player.toString() == prevPlayer.authority.toString())
             );
-            return filteredPlayers;
+            return filteredPlayers; 
              });
 
              /*
@@ -595,7 +595,7 @@ const App: React.FC = () => {
         });
         
         myplayerComponentSubscriptionId.current = providerEphemeralRollup.connection.onAccountChange(myplayerComponent, handleMyPlayerComponentChange, 'processed');
-        (playersComponentClient.current?.account as any).player1.fetch(myplayerComponent, "processed").then(updateMyPlayer).catch((error: any) => {
+         (playersComponentClient.current?.account as any).player1.fetch(myplayerComponent, "processed").then(updateMyPlayer).catch((error: any) => {
             console.error("Failed to fetch account:", error);
          });
         for (let i = 0; i < foodEntities.current.length; i++) {
@@ -1457,7 +1457,7 @@ const App: React.FC = () => {
                     /*
                     (playersComponentClient.current?.account as any).player1.fetch(myplayerComponent, "processed").then(updateMyPlayer).catch((error: any) => {
                         console.error("Failed to fetch account:", error);
-                     });
+                     });*/
 
                     for (let i = 0; i < foodEntities.current.length; i++) {
                         const foodComponenti = FindComponentPda({
@@ -1471,7 +1471,7 @@ const App: React.FC = () => {
                           console.error("Failed to fetch account:", error);
                         });
                     }
-                    */
+                    
             
                     // Subscribe to grid changes
                     const mapComponent = FindComponentPda({
@@ -1481,7 +1481,7 @@ const App: React.FC = () => {
                     (mapComponentClient.current?.account as any).maplite.fetch(mapComponent, "processed").then(updateMap).catch((error: any) => {
                         console.error("Failed to fetch account:", error);
                      });
-
+ 
                     for (let i = 0; i < playerEntities.current.length; i++) {
                         const playersComponenti = FindComponentPda({
                             componentId: PLAYER_COMPONENT,
@@ -1504,15 +1504,16 @@ const App: React.FC = () => {
     };
     
     useEffect(() => {
-        /*const intervalId = setInterval(() => {
+        const intervalId = setInterval(() => {
             handleMovementAndCharging(); 
         }, 30); 
         
         return () => clearInterval(intervalId); // Cleanup interval on unmount*/
-        handleMovementAndCharging(); 
+        //handleMovementAndCharging(); 
     }, [gameId, currentPlayer]);
     
-    useEffect(() => {
+    
+   useEffect(() => {
         const updatePlayerPosition = (
             player: Blob,
             target_x: number,

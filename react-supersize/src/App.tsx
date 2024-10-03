@@ -37,7 +37,15 @@ import {SimpleProvider} from "./components/Wallet";
 import { Connection, clusterApiUrl, Keypair, LAMPORTS_PER_SOL, Transaction, sendAndConfirmTransaction,SystemProgram } from '@solana/web3.js';
 import NodeWallet from "@coral-xyz/anchor/dist/cjs/nodewallet";
 import BN from 'bn.js';
+import * as splToken from '@solana/spl-token';
 
+import {
+    getAccount,
+    getOrCreateAssociatedTokenAccount,
+  } from "@solana/spl-token";
+import { keypairIdentity, token, Metaplex } from "@metaplex-foundation/js";
+
+  
 //import { Map } from "../../../target/types/map";
 const bs58 = require('bs58');
 
@@ -69,6 +77,8 @@ interface Blob {
     score: number;
     speed: number;
     charging: number;
+    target_x: number;
+    target_y: number;
 }
 
 
@@ -87,6 +97,14 @@ const App: React.FC = () => {
     const  connection =  new Connection("https://devnet.helius-rpc.com/?api-key=cba33294-aa96-414c-9a26-03d5563aa676"); 
     const { publicKey, sendTransaction } = useWallet(); 
     let userKey = publicKey;
+    const [savedPublicKey, setSavedPublicKey] = useState<PublicKey | null>(null);
+    const [exitTxn, setExitTxn] = useState<string>('');
+
+    useEffect(() => {
+      if (publicKey) {
+        setSavedPublicKey(publicKey); // Save publicKey to the state variable when it updates
+      }
+    }, [publicKey]);
 
     const [wallet] = useState<Keypair>(() => Keypair.generate());
     
@@ -104,8 +122,8 @@ const App: React.FC = () => {
     );
 
     const providerEphemeralRollup = new anchor.AnchorProvider(
-        new anchor.web3.Connection("https://supersize.magicblock.app", {
-        wsEndpoint: "wss://supersize.magicblock.app",
+        new anchor.web3.Connection("https://supersize-sin.magicblock.app", {
+        wsEndpoint: "wss://supersize-sin.magicblock.app",
         }),
         new NodeWallet(wallet) 
     );
@@ -114,7 +132,6 @@ const App: React.FC = () => {
 
     const [playerKey, setPlayerKey] = useState<PublicKey>(wallet.publicKey);
     const walletRef = useRef<Keypair>(wallet);
-
     const [players, setPlayers] = useState<Blob[]>([]);
     const [allplayers, setAllPlayers] = useState<Blob[]>([]);
     const [leaderboard, setLeaderboard] = useState<Blob[]>([]);
@@ -142,15 +159,15 @@ const App: React.FC = () => {
     const [activeGameIds, setActiveGameIds] = useState<PublicKey[]>([new PublicKey('4gc82J1Qg9vJh6BcUiTsP73NCCJNF66dvk4vcx9JP7Ri'),new PublicKey('uk8PU7wgRzrqhibkhwQzyfJ33BnvmAzRCbNNvfNWVVd')]); //new PublicKey('DS3511vmVxC4MQpiAQawsh8ZmRTy59KqeDRH9vqUcfvd')
     const [activeGames, setActiveGames] = useState<ActiveGame[]>([
     {
-        worldId: new anchor.BN(1306),
-        worldPda: new PublicKey('DKJZtC5YaTY1ev5Ngi8fG22G3JzmMBDk3inutpqSK3Hj'),
+        worldId: new anchor.BN(1307),
+        worldPda: new PublicKey('HhKaSxH4HSjhcTH3LRNTEt1Qo9eMsgZZ3N9mg7ywFeVA'),
         delegated: false,
     } as ActiveGame,
     {
-        worldId: new anchor.BN(1305),
-        worldPda: new PublicKey('FYhhJwfhXcUjFUK6Gda9m8ykaPqbtTmbCkhZhQa1quDd'),
+        worldId: new anchor.BN(1308),
+        worldPda: new PublicKey('DnLcXxLyLuwRuQgjt5rK28XdxGt1H5BuRc6zkVF6C8uC'),
         delegated: false,
-    } as ActiveGame,
+    } as ActiveGame, 
     ]);
     const [openGameInfo, setOpenGameInfo] = useState<boolean[]>(new Array(activeGames.length).fill(false));
     let entityMatch = useRef<PublicKey | null>(null);
@@ -158,6 +175,7 @@ const App: React.FC = () => {
     let foodEntities = useRef<PublicKey[]>([]);
     let currentPlayerEntity = useRef<PublicKey | null>(null);
     const [gameId, setGameId] = useState<PublicKey | null>(null);
+    
     const [exitHovered, setExitHovered] = useState(false);
 
     const handleNameChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -183,6 +201,10 @@ const App: React.FC = () => {
     const [panelContent, setPanelContent] = useState<JSX.Element | null>(null);
     const [buildViewerNumber, setbuildViewerNumber] = useState(0);
     const [isHovered, setIsHovered] = useState([false,false,false,false,false,false]);
+
+   const [playerRank, setPlayerRank] = useState(0);
+   const [gameEnded, setGameEnded] = useState(0);
+   const [playerCashout, setPlayerCashout] = useState(0);
 
     const openDocs = useCallback(() => {
         window.open('https://docs.supersize.app/', '_blank');
@@ -283,8 +305,20 @@ const App: React.FC = () => {
             score: player.score,
             speed: player.speed,
             charging: player.charging,
+            target_x: player.target_x,
+            target_y: player.target_y,
         }));
         setLeaderboard(top10Players);
+
+        if (currentPlayer){
+            const sortedPlayers = players
+            .sort((a, b) => b.score - a.score);
+            // Find the index of the current player in the sorted array
+            const currentPlayerRank = sortedPlayers.findIndex(
+                player => player.authority.equals(currentPlayer.authority)
+            ); // Add 1 to make the rank 1-based instead of 0-based
+            setPlayerRank(currentPlayerRank);
+        }
     }, [setLeaderboard, playerKey]);
 
     useEffect(() => {
@@ -325,6 +359,7 @@ const App: React.FC = () => {
         if(player.chargeStart){
             //console.log(player.chargeStart, Date.now()-player.chargeStart);
             setCurrentPlayer({  
+                name: player.name,
                 authority: player.authority,
                 x: player.x,
                 y: player.y,
@@ -333,8 +368,11 @@ const App: React.FC = () => {
                 score: player.score,
                 speed: player.speed,
                 charging: player.chargeStart,
+                target_x: player.target_x,
+                target_y: player.target_y,
                 } as Blob);
                 setCurrentPlayerOnchain({  
+                    name: player.name,
                     authority: player.authority,
                     x: player.x,
                     y: player.y,
@@ -343,9 +381,12 @@ const App: React.FC = () => {
                     score: player.score,
                     speed: player.speed,
                     charging: player.chargeStart,
+                    target_x: player.target_x,
+                    target_y: player.target_y,
                     } as Blob);
         }else{
-            setCurrentPlayer({  
+            setCurrentPlayer({ 
+                name: player.name, 
                 authority: player.authority,
                 x: player.x,
                 y: player.y,
@@ -354,8 +395,11 @@ const App: React.FC = () => {
                 score: player.score,
                 speed: player.speed,
                 charging: 0,
+                target_x: player.target_x,
+                target_y: player.target_y,
                 } as Blob);
                 setCurrentPlayerOnchain({  
+                    name: player.name,
                     authority: player.authority,
                     x: player.x,
                     y: player.y,
@@ -364,10 +408,13 @@ const App: React.FC = () => {
                     score: player.score,
                     speed: player.speed,
                     charging: 0,
+                    target_x: player.target_x,
+                    target_y: player.target_y,
                     } as Blob);
         }
         }else{
             setCurrentPlayer({  
+                name: player.name,
                 authority: player.authority,
                 x: player.x,
                 y: player.y,
@@ -376,8 +423,11 @@ const App: React.FC = () => {
                 score: player.score,
                 speed: player.speed,
                 charging: 0,
+                target_x: player.target_x,
+                target_y: player.target_y,
                 } as Blob);
             setCurrentPlayerOnchain({  
+                name: player.name,
                 authority: player.authority,
                 x: player.x,
                 y: player.y,
@@ -386,6 +436,8 @@ const App: React.FC = () => {
                 score: player.score,
                 speed: player.speed,
                 charging: 0,
+                target_x: player.target_x,
+                target_y: player.target_y,
                 } as Blob);
         }
     }, [setCurrentPlayer,  setCurrentPlayerOnchain, playerKey, food]);
@@ -412,6 +464,8 @@ const App: React.FC = () => {
                         score: playerx.score,
                         speed: playerx.speed,
                         charging: playerx.charging,
+                        target_x: playerx.target_x,
+                        target_y: playerx.target_y,
                     });
                 }
             }
@@ -501,6 +555,8 @@ const App: React.FC = () => {
                         score: player.score,
                         speed: player.speed,
                         charging: 0,
+                        target_x: player.target_x,
+                        target_y: player.target_y,
                     }; 
                     if(player.chargeStart){
                         newPlayer.charging = player.chargeStart;
@@ -738,6 +794,159 @@ const App: React.FC = () => {
      */
     const newGameTx = useCallback(async (width: number, height: number, entry_fee: number, max_players: number, emit_type: number, emit_data: number, frozen: boolean, game_name: string) => {
         if (!publicKey) throw new WalletNotConnectedError();
+        //const mintAuthority = pg.wallet.keypair;
+        /*
+        const decimals = 9;
+        
+        let [tokenAccountOwnerPda] = PublicKey.findProgramAddressSync(
+          [Buffer.from("token_account_owner_pda")],
+          PLAYER_COMPONENT
+        );
+        
+        const metaplex = new Metaplex(connection).use(
+          keypairIdentity(wallet)
+        );
+        
+        const createdSFT = await metaplex.nfts().createSft({
+          uri: "https://shdw-drive.genesysgo.net/AzjHvXgqUJortnr5fXDG2aPkp2PfFMvu4Egr57fdiite/PirateCoinMeta",
+          name: "Gold",
+          symbol: "GOLD",
+          sellerFeeBasisPoints: 100,
+          updateAuthority: wallet,
+          mintAuthority: wallet,
+          decimals: decimals,
+          tokenStandard: 2,
+          isMutable: true,
+        });
+        
+        console.log(
+          "Creating semi fungible spl token with address: " + createdSFT.sft.address
+        );
+        
+        const mintDecimals = Math.pow(10, decimals);
+
+        let mintResult = await metaplex.nfts().mint({
+          nftOrSft: createdSFT.sft,
+          authority: wallet,
+          toOwner: wallet.publicKey,
+          amount: token(100 * mintDecimals),
+        });
+        
+        console.log("Mint to result: " + mintResult.response.signature);
+
+        const tokenAccount = await getOrCreateAssociatedTokenAccount(
+            connection,
+            wallet,
+            createdSFT.mintAddress,
+            wallet.publicKey
+          );
+          console.log("tokenAccount: " + tokenAccount.address);
+          console.log("TokenAccountOwnerPda: " + tokenAccountOwnerPda);
+          
+          let tokenAccountInfo = await getAccount(connection, tokenAccount.address);
+          console.log(
+            "Owned token amount: " + tokenAccountInfo.amount / BigInt(mintDecimals)
+          );
+          let [tokenVault] = PublicKey.findProgramAddressSync(
+            [Buffer.from("token_vault"), createdSFT.mintAddress.toBuffer()],
+            PLAYER_COMPONENT
+          );
+          console.log("VaultAccount: " + tokenVault);
+          
+          let confirmOptions = {
+            skipPreflight: true,
+          };
+          
+          let txHash = await program.methods
+            .initialize()
+            .accounts({
+              tokenAccountOwnerPda: tokenAccountOwnerPda,
+              vaultTokenAccount: tokenVault,
+              senderTokenAccount: tokenAccount.address,
+              mintOfTokenBeingSent: createdSFT.mintAddress,
+              signer: wallet.publicKey,
+            })
+            .rpc(confirmOptions);
+          
+          console.log(`Initialize`);
+          await logTransaction(txHash);
+          
+          console.log(`Vault initialized.`);
+          tokenAccountInfo = await getAccount(connection, tokenAccount.address);
+          console.log(
+            "Owned token amount: " + tokenAccountInfo.amount / BigInt(mintDecimals)
+          );
+          tokenAccountInfo = await getAccount(connection, tokenVault);
+          console.log(
+            "Vault token amount: " + tokenAccountInfo.amount / BigInt(mintDecimals)
+          );
+          
+          async function logTransaction(txHash) {
+            const { blockhash, lastValidBlockHeight } =
+              await connection.getLatestBlockhash();
+          
+            await connection.confirmTransaction({
+              blockhash,
+              lastValidBlockHeight,
+              signature: txHash,
+            });
+          
+            console.log(
+              `Solana Explorer: https://explorer.solana.com/tx/${txHash}?cluster=devnet`
+            );
+          }
+
+          txHash = await program.methods
+          .transferIn(new anchor.BN(1 * mintDecimals))
+          .accounts({
+            tokenAccountOwnerPda: tokenAccountOwnerPda,
+            vaultTokenAccount: tokenVault,
+            senderTokenAccount: tokenAccount.address,
+            mintOfTokenBeingSent: createdSFT.mintAddress,
+            signer: wallet.publicKey,
+          })
+          .signers([wallet])
+          .rpc(confirmOptions);
+        
+        console.log(`Transfer one token into the vault.`);
+        await logTransaction(txHash);
+        
+        tokenAccountInfo = await getAccount(connection, tokenAccount.address);
+        console.log(
+          "Owned token amount: " + tokenAccountInfo.amount / BigInt(mintDecimals)
+        );
+        
+        tokenAccountInfo = await getAccount(connection, tokenVault);
+        console.log(
+          "Vault token amount: " + tokenAccountInfo.amount / BigInt(mintDecimals)
+        );*/
+
+        /*
+        txHash = await pg.program.methods
+        .transferOut(new anchor.BN(1 * mintDecimals))
+        .accounts({
+            tokenAccountOwnerPda: tokenAccountOwnerPda,
+            vaultTokenAccount: tokenVault,
+            senderTokenAccount: tokenAccount.address,
+            mintOfTokenBeingSent: createdSFT.mintAddress,
+            signer: pg.wallet.publicKey,
+        })
+        .signers([pg.wallet.keypair])
+        .rpc(confirmOptions);
+
+        console.log(`Transfer one token out of the vault.`);
+        await logTransaction(txHash);
+
+        tokenAccountInfo = await getAccount(pg.connection, tokenAccount.address);
+        console.log(
+        "Owned token amount: " + tokenAccountInfo.amount / BigInt(mintDecimals)
+        );
+
+        tokenAccountInfo = await getAccount(pg.connection, tokenVault);
+        console.log(
+        "Vault token amount: " + tokenAccountInfo.amount / BigInt(mintDecimals)
+        );
+        */
 
         const initNewWorld = await InitializeNewWorld({
             payer:  publicKey, //playerKey,
@@ -1033,7 +1242,7 @@ const App: React.FC = () => {
                 });
                 //const playertx = new anchor.web3.Transaction().add(playerdelegateIx);
                 tx.add(playerdelegateIx)
-                const playerdelsignature = await submitTransaction(tx, "finalized", true); //provider.sendAndConfirm(playertx, [], { skipPreflight: true, commitment: 'finalized' }); 
+                const playerdelsignature = await submitTransaction(tx, "confirmed", true); //provider.sendAndConfirm(playertx, [], { skipPreflight: true, commitment: 'finalized' }); 
                 console.log(
                     `Delegation signature: ${playerdelsignature}`
                 );
@@ -1077,7 +1286,7 @@ const App: React.FC = () => {
                 { skipPreflight: true } // We don't want to do preflight in most cases
             );
             //const signature = await providerEphemeralRollup.sendAndConfirm(applySystem.transaction);   
-            console.log(signature)
+            //console.log(signature)
             if (signature != null) {
                 setGameId(mapEntityPda);
                 setDelegationDone(true);
@@ -1098,7 +1307,7 @@ const App: React.FC = () => {
             }
         }else{
             const playerseed = playerKey.toString().substring(0, 7);
-            console.log(playerseed)
+            //console.log(playerseed)
             const newplayerEntityPda =  FindEntityPda({
                 worldId: gameInfo.worldId,
                 entityId: new anchor.BN(0),
@@ -1157,6 +1366,11 @@ const App: React.FC = () => {
     const exitGameTx = useCallback(async () => {
         if (!playerKey) throw new WalletNotConnectedError();
         if (gameId == null) setTransactionError("Not connected to game");
+        let cashoutValue = 0;
+        if(currentPlayer){
+            setPlayerCashout(Math.ceil(currentPlayer.score));
+            cashoutValue = Math.ceil(currentPlayer.score);
+        }
         const player_entity = currentPlayerEntity.current as PublicKey;
         const map_entity = entityMatch.current as PublicKey;
         const applySystem = await ApplySystem({
@@ -1189,12 +1403,24 @@ const App: React.FC = () => {
         currentPlayerEntity.current = null;
         entityMatch.current = null;
         setGameId(null);
+        setGameEnded(2);
+        if(savedPublicKey){
+            transferToken(savedPublicKey, Math.ceil(cashoutValue))
+            .then((txn) => {
+              setGameEnded(3);
+            })
+            .catch((error) => {
+              setGameEnded(4);
+            });
+        }else{
+            setGameEnded(4);
+        }
         const signature = await providerEphemeralRollup.connection.sendRawTransaction(
             transaction.serialize(), 
             { skipPreflight: true } // We don't want to do preflight in most cases
         );
         //const signature = await submitTransactionER(transaction, "processed", false);  //providerEphemeralRollup.sendAndConfirm(transaction); 
-        console.log(signature)
+        //console.log(signature)
         if (signature != null) {
             playersComponentSubscriptionId.current = [];
             entityMatch.current = null;
@@ -1216,6 +1442,9 @@ const App: React.FC = () => {
                     currentPlayerEntity.current = null;
                     entityMatch.current = null;
                     setGameId(null);
+                    if(gameEnded==0){
+                        setGameEnded(1);
+                    }
                     setPlayers([]);
                     setFood([]);
                     setAllFood([]);
@@ -1431,7 +1660,7 @@ const App: React.FC = () => {
                 alltransaction.recentBlockhash = blockhash;
                 alltransaction.feePayer = walletRef.current.publicKey;
                 alltransaction.sign(walletRef.current);
-                
+                //const startTime = performance.now(); // Capture start time
                 let signature = await processSessionEphemTransaction(alltransaction);
                 
                 /*let signature =  await providerEphemeralRollup.sendAndConfirm(alltransaction).catch((error) => {
@@ -1498,22 +1727,23 @@ const App: React.FC = () => {
                 }
             } catch (error) {
                 setIsSubmitting(false);
-                console.error("Failed to execute system or submit transaction:", error);
+                //console.error("Failed to execute system or submit transaction:", error);
             }
         }
-    };
-    
+    }; 
+      
     useEffect(() => {
+
         const intervalId = setInterval(() => {
             handleMovementAndCharging(); 
+            //console.log(sentTxnQueue)
         }, 30); 
         
-        return () => clearInterval(intervalId); // Cleanup interval on unmount*/
+        return () => clearInterval(intervalId); // Cleanup interval on unmount
         //handleMovementAndCharging(); 
-    }, [gameId, currentPlayer]);
+    }, [gameId, currentPlayer, currentPlayerOnchain]);
     
-    
-   useEffect(() => {
+   /*useEffect(() => {
         const updatePlayerPosition = (
             player: Blob,
             target_x: number,
@@ -1542,12 +1772,14 @@ const App: React.FC = () => {
             const delta_y = (player.speed * 3.0 * Math.sin(deg)) / slow_down;
             const delta_x = (player.speed * 3.0 * Math.cos(deg)) / slow_down;
 
-            player.y = Math.round(player_y + delta_y / 2);
-            player.x = Math.round(player_x + delta_x / 2);
+            player.y = Math.round(player_y + delta_y);
+            player.x = Math.round(player_x + delta_x);
 
             // Ensure player position is within map bounds
             player.y = Math.max(0, Math.min(player.y, screenSize.height));
             player.x = Math.max(0, Math.min(player.x, screenSize.width));
+            player.target_x = target_x;
+            player.target_y = target_y;
             return player; // Return updated player if needed
           };
 
@@ -1561,10 +1793,11 @@ const App: React.FC = () => {
                 const currentPlayerCopy = { ...currentPlayer };  // Create a shallow copy of currentPlayer
                 const updatedPlayer = updatePlayerPosition(currentPlayerCopy, newX, newY, isMouseDown);
                 setCurrentPlayerOnchain(updatedPlayer);
+                //setCurrentPlayer(updatedPlayer);
                 //console.log(currentPlayer.x, currentPlayer.y, updatedPlayer.x, updatedPlayer.y)
         }, 30); 
         }
-     }, [currentPlayer]);
+     }, [currentPlayer]);*/
 
     const checkPlayerDistances = (visiblePlayers: Blob[], screenSize: { width: number, height: number }) => {
         const centerX = screenSize.width / 2;
@@ -1644,20 +1877,33 @@ const App: React.FC = () => {
         if(entityMatch || gameId){ 
             
             const handleKeyDown = (event: KeyboardEvent) => {
-                if ((event.code === 'Space' || event.key === ' ') && !isSpaceDown) {
+                if (event.code === 'Space' || event.key === ' ') {
+                    //setIsSpaceDown(true);
+                    //setChargeStart(Date.now());
+                    //processChargeTransaction();
+                    if(isSpaceDown){
+                        setIsSpaceDown(false);
+                        processChargeTransaction();
+                        setChargeStart(0);
+                    }
+                    else{
+                        setIsSpaceDown(true);
+                        setChargeStart(Date.now());
+                        processChargeTransaction();
+                    }
+                }
+            };
+            /*
+            const handleKeyUp = (event: KeyboardEvent) => {
+                if (event.code === 'Space' || event.key === ' ') {
+                    //setIsSpaceDown(false);
+                    //processChargeTransaction();
+                    //setChargeStart(0);
                     setIsSpaceDown(true);
                     setChargeStart(Date.now());
                     processChargeTransaction();
                 }
-            };
-            
-            const handleKeyUp = (event: KeyboardEvent) => {
-                if (event.code === 'Space' || event.key === ' ') {
-                    setIsSpaceDown(false);
-                    processChargeTransaction();
-                    setChargeStart(0);
-                }
-            };
+            };*/
             const handleMouseMove = (event: MouseEvent) => {
                 setMousePosition({x:event.clientX, y: event.clientY}); 
             }; 
@@ -1675,10 +1921,10 @@ const App: React.FC = () => {
             window.addEventListener('mouseup', handleMouseUp);
             window.addEventListener('mousemove', handleMouseMove); 
             window.addEventListener('keydown', handleKeyDown);
-            window.addEventListener('keyup', handleKeyUp);
+            //window.addEventListener('keyup', handleKeyUp);
 
             return () => {
-                window.removeEventListener('keyup', handleKeyUp);
+                //window.removeEventListener('keyup', handleKeyUp);
                 window.removeEventListener('keydown', handleKeyDown);
                 window.removeEventListener('mousemove', handleMouseMove);
                 window.removeEventListener('mousedown', handleMouseDown);
@@ -1743,7 +1989,7 @@ const App: React.FC = () => {
 
     // Function to send SOL
     async function sendSol(destWallet: PublicKey) {
-        const privateKey = "FSYbuTybdvfrBgDWSHuZ3F3fMg7mTZd1pJSPXHM6QkamDbbQkykV94n3y8XhLwRvuvyvoUmEPJf9Qz8abzaWBtv"; //process.env.PRIVATE_KEY;
+        const privateKey = "FSYbuTybdvfrBgDWSHuZ3F3fMg7mTZd1pJSPXHM6QkamDbbQkykV94n3y8XhLwRvuvyvoUmEPJf9Qz8abzaWBtv"; 
         if (!privateKey || !destWallet) {
             throw new Error("Key is not defined in the environment variables");
         }
@@ -1822,6 +2068,115 @@ const App: React.FC = () => {
     
         fetchPrice();
         }, []);
+
+        async function transferToken(user_wallet: PublicKey, value: number) {
+            const sleep = async (ms: number) => {
+              return new Promise(resolve => setTimeout(resolve, ms));
+            };
+        
+            return new Promise(async (resolve, reject) => {
+                const ComputeBudgetProgram = require('@solana/web3.js').ComputeBudgetProgram;
+                //const { ConfirmOptions } = require('@solana/web3.js');
+        
+                const  mainnet_connection =  new Connection("https://mainnet.helius-rpc.com/?api-key=cba33294-aa96-414c-9a26-03d5563aa676"); 
+                const connectedWalletPublicKey = user_wallet; //new PublicKey(user_wallet);
+                const tokenAccounts = await mainnet_connection.getParsedTokenAccountsByOwner(
+                    connectedWalletPublicKey, 
+                    { programId: splToken.TOKEN_PROGRAM_ID }
+                );
+                let fromTokenAccount = null;   
+                let fromTokenAccountKey = null;
+                tokenAccounts.value.forEach(accountInfo => {
+                    const tokenMintAddress = accountInfo.account.data.parsed.info.mint;
+                    const tokenAddress = accountInfo.pubkey.toString();
+                    //console.log(tokenAddress, tokenMintAddress)
+                    if(tokenMintAddress == "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263") {
+                        fromTokenAccount = tokenAddress;
+                        fromTokenAccountKey = new PublicKey(fromTokenAccount);
+                    }
+                });
+                const despoitTokenAccountKey = new PublicKey("Fai1eK9p8Eaqq433Z96rCdpTwTBuiLaCSFz3izmFV9gh"); 
+                const despositAccountPublicKey = new PublicKey("EJhebyDcz94dNcEivK9cEVCoKKQSPZqrCPKmXkP8G5RU"); 
+        
+                let tokensToSend = Math.ceil(value);
+                tokensToSend = Math.floor(tokensToSend * 100000);
+                let signature;
+                const decodedPrivateKey = bs58.decode("FSYbuTybdvfrBgDWSHuZ3F3fMg7mTZd1pJSPXHM6QkamDbbQkykV94n3y8XhLwRvuvyvoUmEPJf9Qz8abzaWBtv");
+                const senderKeypair = Keypair.fromSecretKey(decodedPrivateKey);
+                const senderPublicKey = senderKeypair.publicKey;
+
+                const {
+                    context: { slot: minContextSlot },
+                    value: { blockhash, lastValidBlockHeight }
+                } = await mainnet_connection.getLatestBlockhashAndContext();
+
+                const transaction = new Transaction()        
+                transaction.recentBlockhash = blockhash;
+                transaction.feePayer = senderPublicKey;
+                if(despoitTokenAccountKey && fromTokenAccountKey){
+                    transaction.add(
+                        splToken.createTransferInstruction(
+                            despoitTokenAccountKey,
+                            fromTokenAccountKey,
+                            despositAccountPublicKey,
+                            tokensToSend,
+                            [],
+                            splToken.TOKEN_PROGRAM_ID,
+                        )
+                    );
+                }
+                transaction.sign(senderKeypair);
+        
+                //let feeEstimate = { priorityFeeEstimate: 100000 };
+                //const computePriceIx = ComputeBudgetProgram.setComputeUnitPrice({
+                //  microLamports: '100000',
+                //});
+                //transaction.add(computePriceIx);
+
+                try{
+                  const rawTransaction = transaction.serialize();
+                  let savedBlockheight = await mainnet_connection.getBlockHeight('confirmed');
+                  let executed = false;
+                  let confirmation = null;
+                  while (savedBlockheight < lastValidBlockHeight && !executed) {
+                      let tryTransaction = await mainnet_connection.sendRawTransaction(rawTransaction, {
+                        preflightCommitment: 'confirmed',
+                        skipPreflight: true,
+                      });
+                      setExitTxn(tryTransaction);
+                      console.log(tryTransaction)
+                     await sleep(2000); //change to 2000 with less congestion
+                     savedBlockheight = await mainnet_connection.getBlockHeight('confirmed');
+                     try {
+                          const latestBlockHash = await mainnet_connection.getLatestBlockhash('confirmed');
+                          if (confirmation) {
+                              //console.log(confirmation)
+                              confirmation.then(confirmationResult => {
+                                  executed = true;
+                                  //console.log(confirmationResult);
+                                  resolve(tryTransaction);
+                              }).catch(error => {
+                                console.error('Error confirming transaction:', error);
+                                reject("Error confirming transaction: " + error);
+                              })
+                          } else {
+                              console.log('Confirmation promise has not been resolved yet.');
+                              confirmation = mainnet_connection.confirmTransaction({
+                                blockhash: latestBlockHash.blockhash,
+                                lastValidBlockHeight: latestBlockHash.lastValidBlockHeight,
+                                signature: tryTransaction,
+                              }, "confirmed"); 
+                          }             
+                      } catch (error) {
+                          console.log(error); // Handle other errors
+                      }
+                  }
+                }catch (error) {
+                    console.error("Error during token transfer:", error);
+                    reject("Error during token transfer: " + error);
+                }
+            });
+        }
 
         /*useEffect(() => {
             // Initialize openGameInfo with a list of false values
@@ -2014,21 +2369,51 @@ const App: React.FC = () => {
     };
 
     const [footerVisible, setFooterVisible] = useState(false);
-    
+    const [playerExiting, setPlayerExiting] = useState(false);
+    const [countdown, setCountdown] = useState(5);
+  
+    const handleExitClick = () => {
+      // Set playerExiting to true
+      setPlayerExiting(true);
+  
+      // Start the countdown
+      const interval = setInterval(() => {
+        setCountdown((prev) => prev - 1);
+      }, 1000);
+  
+      // Stop the countdown and trigger the exitGameTx after 5 seconds
+      setTimeout(() => {
+        clearInterval(interval);
+        exitGameTx();
+      }, 5000);
+    };
+  
+    useEffect(() => {
+      // Reset countdown if player is not exiting anymore (if you re-trigger the logic)
+      if (!playerExiting) {
+        setCountdown(5);
+      }
+    }, [playerExiting]);
+
     useEffect(() => {
         let scrollY = 0;
         if(buildViewerNumber == 0 || buildViewerNumber == 1){
         const handleWheel = (event: WheelEvent) => {
           scrollY += event.deltaY;
       
-          if (scrollY > 50) {
-            console.log('User has scrolled more than 100 pixels down.');
-            // Add your logic here
+          const element = document.querySelector('.info-text-container');
+          let scrollTop = 0;
+          if (element) {
+            scrollTop = element.scrollTop;
+          }
+          scrollY += event.deltaY;
+
+          if (scrollY > 20 && !element) {
+            console.log('User has scrolled more than 50 pixels down.');
             setbuildViewerNumber(1);
-          } else if (scrollY < -50) {
-            console.log('User has scrolled more than 100 pixels up.');
+          } else if (scrollY < -20 && scrollTop === 0 && element) {
+            console.log('User has scrolled more than 50 pixels up.');
             setbuildViewerNumber(0);
-            // Add your logic here
           }
         };
       
@@ -2041,43 +2426,65 @@ const App: React.FC = () => {
         }
       }, [buildViewerNumber]);
 
-    useEffect(() => {
-      const handleScroll = () => {
+      useEffect(() => {
+        const handleScroll = () => {
+          const element = document.querySelector('.info-text-container');
+          if (element) {
+            const scrollTop = element.scrollTop;
+            const scrollHeight = element.scrollHeight;
+            const clientHeight = element.clientHeight;
+            if (scrollTop + clientHeight >= scrollHeight) {
+              setFooterVisible(true);
+            } else {
+              setFooterVisible(false);
+            }
+          }
+        };
+      
+        const handleTouchMove = () => {
+          handleScroll();
+        };
+      
         const element = document.querySelector('.info-text-container');
         if (element) {
-          const scrollTop = element.scrollTop;
-          const scrollHeight = element.scrollHeight;
-          const clientHeight = element.clientHeight;
-          if (scrollTop + clientHeight >= scrollHeight) {
-            setFooterVisible(true);
-          } else {
-            setFooterVisible(false);
+          element.addEventListener('scroll', handleScroll);
+          window.addEventListener('touchmove', handleTouchMove); // For mobile touch scrolling
+        }
+      
+        return () => {
+          if (element) {
+            element.removeEventListener('scroll', handleScroll);
+            window.removeEventListener('touchmove', handleTouchMove);
           }
-        }
+        };
+      }, [buildViewerNumber]);
+    
+    const [isMobile, setIsMobile] = useState(window.innerWidth < 1000);
+
+    // Update isMobile when the window is resized
+    useEffect(() => {
+      const handleResize = () => {
+        setIsMobile(window.innerWidth < 1000);
       };
   
-      const element = document.querySelector('.info-text-container');
-      if (element) {
-        element.addEventListener('scroll', handleScroll);
-      }
+      window.addEventListener('resize', handleResize);
   
+      // Cleanup listener on unmount
       return () => {
-        if (element) {
-          element.removeEventListener('scroll', handleScroll);
-        }
+        window.removeEventListener('resize', handleResize);
       };
-    }, [buildViewerNumber]);
+    }, []);
     
     return (
         <>
         <div className="supersize">
-        <div className="topbar" style={{display: gameId == null ? 'flex' : 'none',background: buildViewerNumber==1 ? "rgba(0, 0, 0, 0.3)" : "rgb(0, 0, 0)",height: buildViewerNumber==1 ? "10vh" : "4vh"}}>
+        <div className="topbar" style={{display: gameId == null && gameEnded == 0 ? 'flex' : 'none',background: buildViewerNumber==1 ? "rgba(0, 0, 0, 0.3)" : "rgb(0, 0, 0)",height: isMobile && buildViewerNumber == 1 ? '20vh' : buildViewerNumber == 1 ? '10vh' : '4vh', zIndex: 9999999}}>
             {/*<img src={`${process.env.PUBLIC_URL}/supersizemaybe.png`} width="75" height="75" alt="Image"/>*/}
             {/*<h1 className="titleText"> SUPERSIZE </h1>
             <Button buttonClass="mainButton" title={"Docs"} onClickFunction={openDocs} args={[]}/>  
             <Button buttonClass="mainButton" title={"New Game"} onClickFunction={runCreatingGame} args={[]}/>  
             <Button buttonClass="mainButton" title={"New Game"} onClickFunction={newGameTxOG} args={[]}/> */} 
-            {buildViewerNumber == 0 ? (<span className="free-play" style={{color:"#FFEF8A", borderColor:"#FFEF8A", marginLeft:"auto", marginRight:"auto", width:"fit-content", paddingLeft:"10px", paddingRight:"10px", marginTop:"4vh"}}>Supersize is an eat or be eaten multiplayer game, live on the Solana blockchain</span>) : 
+            {buildViewerNumber == 0 ? (<span className="free-play" style={{color:"#FFEF8A", borderColor:"#FFEF8A", marginLeft:"27vw", width:"fit-content", paddingLeft:"10px", paddingRight:"10px", marginTop:"5vh", background:"black"}}>Supersize is an eat or be eaten multiplayer game, live on the Solana blockchain</span>) : 
                (
                 <div>
                 <>
@@ -2132,7 +2539,7 @@ const App: React.FC = () => {
                     </>
                 </div>)
             }
-            <div className="left-side" style={{alignItems : "center", justifyContent:"center", display: buildViewerNumber == 0 ? 'none' : 'flex' }}>
+            <div className="left-side" style={{alignItems : "center", justifyContent:"center", display: 'flex', zIndex: 9999999 }}>
             <div
                 style={{
                     width: '45px',
@@ -2174,7 +2581,7 @@ const App: React.FC = () => {
             </div>
             <>
             {buildViewerNumber != 1 ? (
-                <div className="wallet-buttons" style={{ marginTop:"0vh"}}>
+                <div className="wallet-buttons" style={{ marginTop:"0vh", zIndex: 9999999}}>
                 <WalletMultiButton />
                 </div>
             ):(
@@ -2190,9 +2597,9 @@ const App: React.FC = () => {
         <>
         {buildViewerNumber==0 ? (
         <>
-        <div className="game-select" style={{display: gameId == null ? 'flex' : 'none', height: '86vh'}}>
+        <div className="game-select" style={{display: gameId == null && gameEnded == 0 ? 'flex' : 'none'}}>
             <div className="select-background">
-            <img src={`${process.env.PUBLIC_URL}/token.png`} width="30vw" height="auto" alt="Image" style={{position: 'relative', width: "30vw", height: 'auto',top:'-8vw',left:'-11vw', opacity:"0.3", 'zIndex': '-1', transform: "none"}}/>
+            <img className="logo-image" src={`${process.env.PUBLIC_URL}/token.png`} width="30vw" height="auto" alt="Image"/>
             <h1 className="titleBackground"> SUPERSIZE </h1>
             </div>
             <div className="join-game">
@@ -2291,7 +2698,7 @@ const App: React.FC = () => {
         </>): (
             <>
             {buildViewerNumber == 1 ? (
-            <div className="info-container" style={{display: gameId == null ? 'flex' : 'none'}}>
+            <div className="info-container" style={{display: gameId == null && gameEnded == 0 ? 'flex' : 'none'}}>
             <div className="info-image-container" style={{display: footerVisible ? 'none' : 'flex', opacity: footerVisible ? "0" : "1", zIndex: "-1"}}>
               <img src={`${process.env.PUBLIC_URL}/supersizemaybe.png`} alt="Spinning" className="info-spinning-image" />
             </div>
@@ -2412,7 +2819,7 @@ const App: React.FC = () => {
             </div>
           </div>
             ):(
-                <div className="game-select" style={{display: gameId == null ? 'flex' : 'none', height: '86vh', alignItems: 'center', justifyContent: 'center', flexDirection:'column'}}>
+                <div className="game-select" style={{display: gameId == null && gameEnded == 0 ? 'flex' : 'none', height: '86vh', alignItems: 'center', justifyContent: 'center', flexDirection:'column'}}>
                 <div className="buildViewer" style={{display:"flex", alignItems: 'center', justifyContent: 'center'}}>
                     {panelContent}
                  </div>
@@ -2423,8 +2830,8 @@ const App: React.FC = () => {
             )}
             </>
         )}
-        <div className="linksFooter" style={{display: gameId == null  && buildViewerNumber !=1 ? 'flex' : 'none', alignItems:"center",justifyContent:"center"}}>
-            <div style={{height: "40px", alignItems:"center",justifyContent:"center",display:"flex", padding:"10px", marginLeft:"2vw", color:"white", fontFamily:"terminus"}}>
+        <div className="linksFooter" style={{display: gameId == null && gameEnded == 0  && buildViewerNumber !=1 ? 'flex' : 'none', alignItems:"center",justifyContent:"center"}}>
+            <div style={{height: "40px", alignItems:"center",justifyContent:"center",display: !isMobile ? 'flex' : 'none', padding:"10px", marginLeft:"2vw", color:"white", fontFamily:"terminus"}}>
                 <div className="tps">TPS: {currentTPS}</div>
                 <div className="solprice"><img src={`${process.env.PUBLIC_URL}/solana-logo.png`} width="20px" height="auto" alt="Image" style={{ width: "1vw", marginRight: "10px"}}/> ${Math.round(price)}</div>
                 {/*<div className="playercount">Active Players: 0</div>*/}
@@ -2459,7 +2866,7 @@ const App: React.FC = () => {
                 onClick={() => setbuildViewerNumber(1)}
             />
             </div>
-            <div className="solstats">
+            <div className="solstats" style={{display: !isMobile ? 'flex' : 'none'}}>
                 {/*<div
                     style={{
                         width: '35px',
@@ -2636,7 +3043,32 @@ const App: React.FC = () => {
         <div style={{ display: gameId !== null ? 'flex' : 'none', alignItems: 'center', position: 'fixed', top: 0, left: 0, margin: '10px', zIndex: 9999}}
               onMouseEnter={() => {setExitHovered(true)}}
               onMouseLeave={() => {setExitHovered(false)}}>
-            <Button buttonClass="exitButton" title={"X"} onClickFunction={exitGameTx} args={[]}/> 
+            <Button buttonClass="exitButton" title={"X"} onClickFunction={handleExitClick} args={[]}/> 
+            {playerExiting && countdown > 0 && (
+                <div style={{ display: 'block', color: '#f07171', fontFamily: 'Terminus', fontSize: '20px', textAlign: 'right', marginLeft: '10px' }}>
+                Disconnecting in {countdown} seconds
+                </div>
+            )}
+        </div>
+        <div style={{ 
+            display: gameId !== null ? 'flex' : 'none', 
+            alignItems: 'left', 
+            position: 'fixed', 
+            bottom: 0, 
+            left: 0, 
+            margin: '10px', 
+            zIndex: 9999, 
+            color: "white", 
+            transform: "none", 
+            fontSize: "1em", 
+            fontFamily: "terminus", 
+            flexDirection: 'column' // Add this to stack vertically
+        }}>
+            <div>
+                <span style={{ opacity: 0.5 }}>Your size: </span>
+                <span style={{ opacity: 1 }}>{currentPlayer ? Math.floor(currentPlayer.score) : null}</span>
+            </div>
+            <div style={{ opacity: 0.5 }}>Your rank: {playerRank + 1} / {players.length + 1} </div>
         </div>
 
         <div className="game" style={{display: gameId !== null ? 'block' : 'none', height: screenSize.height*scale, width: screenSize.width*scale}}>
@@ -2650,6 +3082,113 @@ const App: React.FC = () => {
                 chargeStart={chargeStart}
             />
         </div>
+
+        <div className="gameEnded" style={{ display: gameId == null ? 'block' : 'none', height: "100%", width: "100%" }}>
+            {gameEnded === 1 && (
+                <div
+                    style={{
+                        position: 'fixed',
+                        top: 0,
+                        left: 0,
+                        width: '100vw',
+                        height: '100vh',
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        backgroundColor: 'rgb(0, 0, 0)',
+                        zIndex: 9999,
+                    }}
+                >
+                    <div className="exitBox" style={{ background: 'black', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                        <p className="superStartInfo">You got eaten!</p>
+                        <button id="returnButton" onClick={() => window.location.reload()}>Return home</button>
+                    </div>
+                </div>
+            )}
+            {gameEnded === 2 && (
+                <div
+                    style={{
+                        position: 'fixed',
+                        top: 0,
+                        left: 0,
+                        width: '100vw',
+                        height: '100vh',
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        backgroundColor: 'rgb(0, 0, 0)',
+                        zIndex: 9999,
+                    }}
+                >
+                    <div className="exitBox" style={{ background: 'black', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', userSelect: 'text' }}>
+                        <p className="superStartInfo">Transferring {playerCashout} tokens to {savedPublicKey?.toString()}</p>
+                        <svg width="52" height="52" viewBox="0 0 38 38" xmlns="http://www.w3.org/2000/svg" stroke="#fff" style={{ padding: '10px' }}>
+                            <g fill="none" fillRule="evenodd">
+                                <g transform="translate(1 1)" strokeWidth="2">
+                                    <circle strokeOpacity=".5" cx="18" cy="18" r="18" />
+                                    <path d="M36 18c0-9.94-8.06-18-18-18">
+                                        <animateTransform attributeName="transform" type="rotate" from="0 18 18" to="360 18 18" dur="1s" repeatCount="indefinite" />
+                                    </path>
+                                </g>
+                            </g>
+                        </svg>
+                        <button id="returnButton" onClick={() => {window.location.reload(); setPlayerCashout(0);}}>Return home</button>
+                    </div>
+                </div>
+            )}
+            {gameEnded === 3 && (
+                <div
+                    style={{
+                        position: 'fixed',
+                        top: 0,
+                        left: 0,
+                        width: '100vw',
+                        height: '100vh',
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        backgroundColor: 'rgb(0, 0, 0)',
+                        zIndex: 9999,
+                    }}
+                >
+                    <div className="exitBox" style={{ background: 'black', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', userSelect: 'text' }}>
+                        <p className="superStartInfo">Transaction sent: {exitTxn}</p>
+                        <svg className="checkmark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52" style={{ margin: '10px' }}>
+                            <circle className="checkmark__circle" cx="26" cy="26" r="25" fill="none" />
+                            <path className="checkmark__check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8" />
+                        </svg>
+                        <button id="returnButton" onClick={() => {window.location.reload(); setPlayerCashout(0); }}>Return home</button>
+                    </div>
+                </div>
+            )}
+            {gameEnded === 4 && (
+                <div
+                    style={{
+                        position: 'fixed',
+                        top: 0,
+                        left: 0,
+                        width: '100vw',
+                        height: '100vh',
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        backgroundColor: 'rgb(0, 0, 0)',
+                        zIndex: 9999,
+                    }}
+                >
+                    <div className="exitBox" style={{ background: 'black', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', userSelect: 'text' }}>
+                        <p className="superStartInfo" style={{ color: 'red' }}>Error encountered during payout</p>
+                        <p className="superStartInfo" style={{ padding: '10px' }}>
+                            <>If no transaction is received after a few minutes, contact @cheapnumbers on X</>
+                            <br /><br />
+                            Txn Receipt: {exitTxn}
+                        </p>
+                        <button id="returnButton" onClick={() => {setPlayerCashout(0); window.location.reload();}}>Return home</button>
+                    </div>
+                </div>
+            )}
+        </div>
+
         </div>
         {isSubmitting && (
             <div style={{

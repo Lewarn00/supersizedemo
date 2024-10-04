@@ -99,7 +99,44 @@ const App: React.FC = () => {
     let userKey = publicKey;
     const [savedPublicKey, setSavedPublicKey] = useState<PublicKey | null>(null);
     const [exitTxn, setExitTxn] = useState<string>('');
-
+    const endpoints = [
+        "https://supersize-sin.magicblock.app",
+        "https://supersize-fra.magicblock.app",
+        "https://supersize.magicblock.app",
+      ];
+      
+      // Function to ping an endpoint and return the ping time
+      const pingEndpoint = async (url: string): Promise<number> => {
+        const startTime = performance.now();
+        try {
+          await fetch(url, { method: "HEAD" });
+        } catch (error) {
+          console.error(`Failed to ping ${url}:`, error);
+        }
+        const endTime = performance.now();
+        return endTime - startTime;
+      };
+      const [fastestEndpoint, setFastestEndpoint] = useState<string | null>(null);
+      const [pings, setPings] = useState<Record<string, number>>({});
+    
+      useEffect(() => {
+        const checkEndpoints = async () => {
+          const results: Record<string, number> = {};
+          
+          for (const endpoint of endpoints) {
+            const pingTime = await pingEndpoint(endpoint);
+            results[endpoint] = pingTime;
+          }
+    
+          // Set the endpoint with the lowest ping
+          const lowestPingEndpoint = Object.keys(results).reduce((a, b) => (results[a] < results[b] ? a : b));
+          setPings(results);
+          setFastestEndpoint(lowestPingEndpoint);
+        };
+    
+        checkEndpoints();
+      }, []);
+      
     useEffect(() => {
       if (publicKey) {
         setSavedPublicKey(publicKey); // Save publicKey to the state variable when it updates
@@ -159,16 +196,12 @@ const App: React.FC = () => {
     const [activeGameIds, setActiveGameIds] = useState<PublicKey[]>([new PublicKey('4gc82J1Qg9vJh6BcUiTsP73NCCJNF66dvk4vcx9JP7Ri'),new PublicKey('uk8PU7wgRzrqhibkhwQzyfJ33BnvmAzRCbNNvfNWVVd')]); //new PublicKey('DS3511vmVxC4MQpiAQawsh8ZmRTy59KqeDRH9vqUcfvd')
     const [activeGames, setActiveGames] = useState<ActiveGame[]>([
     {
-        worldId: new anchor.BN(1307),
-        worldPda: new PublicKey('HhKaSxH4HSjhcTH3LRNTEt1Qo9eMsgZZ3N9mg7ywFeVA'),
+        worldId: new anchor.BN(1315),
+        worldPda: new PublicKey('DXkWfajEXk5Ubvg27YWNvVacsacXV9o12i6UsK8X2d27'),
         delegated: false,
     } as ActiveGame,
-    {
-        worldId: new anchor.BN(1308),
-        worldPda: new PublicKey('DnLcXxLyLuwRuQgjt5rK28XdxGt1H5BuRc6zkVF6C8uC'),
-        delegated: false,
-    } as ActiveGame, 
     ]);
+
     const [openGameInfo, setOpenGameInfo] = useState<boolean[]>(new Array(activeGames.length).fill(false));
     let entityMatch = useRef<PublicKey | null>(null);
     let playerEntities = useRef<PublicKey[]>([]);

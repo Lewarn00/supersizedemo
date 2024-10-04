@@ -47,7 +47,12 @@ const GameComponent: React.FC<GameComponentProps> = ({ gameId, players, visibleF
   
   let previousPlayerPos = currentPlayerRef.current;  // Store previous player position
   let currentPlayerPos = currentPlayerRef.current;  // Current position being updated
-    
+  useEffect(() => {
+    foodRef.current = visibleFood;
+  }, [visibleFood]);
+  useEffect(() => {
+    playersRef.current = players;
+  }, [players]);
   useEffect(() => {
     // Whenever currentPlayer updates, update the ref and reset the timer
     currentPlayerRef.current = currentPlayer;
@@ -272,7 +277,6 @@ const GameComponent: React.FC<GameComponentProps> = ({ gameId, players, visibleF
     window.requestAnimationFrame(loop);
   };*/
 
-  
   useEffect(() => {
     if (gameId !== null) {
       const canvas = canvasRef.current;

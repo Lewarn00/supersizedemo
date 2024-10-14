@@ -100,9 +100,9 @@ const App: React.FC = () => {
     const [savedPublicKey, setSavedPublicKey] = useState<PublicKey | null>(null);
     const [exitTxn, setExitTxn] = useState<string>('');
     const endpoints = [
+        "https://supersize-sin.magicblock.app",
         "https://supersize-fra.magicblock.app",
-        "https://supersize-fra.magicblock.app",
-        "https://supersize-fra.magicblock.app",
+        "https://supersize.magicblock.app",
       ];
       
       // Function to ping an endpoint and return the ping time

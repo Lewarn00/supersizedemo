@@ -94,15 +94,15 @@ type ActiveGame = {
 
 const App: React.FC = () => {
     //let { connection } =  useConnection();
-    const  connection =  new Connection("https://devnet.helius-rpc.com/?api-key=cba33294-aa96-414c-9a26-03d5563aa676"); 
+    const  connection =  new Connection("https://sly-blue-cherry.solana-devnet.quiknode.pro/13351562e034e23c97c16dffce573f7a384c080b/"); //"https://devnet.helius-rpc.com/?api-key=cba33294-aa96-414c-9a26-03d5563aa676"); 
     const { publicKey, sendTransaction } = useWallet(); 
     let userKey = publicKey;
     const [savedPublicKey, setSavedPublicKey] = useState<PublicKey | null>(null);
     const [exitTxn, setExitTxn] = useState<string>('');
     const endpoints = [
-        "https://supersize-sin.magicblock.app",
         "https://supersize-fra.magicblock.app",
-        "https://supersize.magicblock.app",
+        "https://supersize-fra.magicblock.app",
+        "https://supersize-fra.magicblock.app",
       ];
       
       // Function to ping an endpoint and return the ping time
@@ -117,8 +117,9 @@ const App: React.FC = () => {
         return endTime - startTime;
       };
       const [fastestEndpoint, setFastestEndpoint] = useState<string | null>(null);
+      const [wsEndpoint, setWsEndpoint] = useState<string | null>(null);
       const [pings, setPings] = useState<Record<string, number>>({});
-    
+      
       useEffect(() => {
         const checkEndpoints = async () => {
           const results: Record<string, number> = {};
@@ -132,6 +133,9 @@ const App: React.FC = () => {
           const lowestPingEndpoint = Object.keys(results).reduce((a, b) => (results[a] < results[b] ? a : b));
           setPings(results);
           setFastestEndpoint(lowestPingEndpoint);
+          // Construct the wsEndpoint by replacing "https" with "wss"
+          const wsUrl = lowestPingEndpoint.replace("https", "wss");
+          setWsEndpoint(wsUrl);
         };
     
         checkEndpoints();
@@ -158,12 +162,12 @@ const App: React.FC = () => {
         }
     );
 
-    const providerEphemeralRollup = new anchor.AnchorProvider(
-        new anchor.web3.Connection("https://supersize-sin.magicblock.app", {
-        wsEndpoint: "wss://supersize-sin.magicblock.app",
+    const providerEphemeralRollup = useRef<anchor.AnchorProvider>(new anchor.AnchorProvider(
+        new anchor.web3.Connection("https://supersize.magicblock.app", {
+        wsEndpoint: "wss://supersize.magicblock.app",
         }),
         new NodeWallet(wallet) 
-    );
+    ));
 
     anchor.setProvider(provider);
 
@@ -194,13 +198,44 @@ const App: React.FC = () => {
     const [transactionError, setTransactionError] = useState<string | null>(null);
     const [transactionSuccess, setTransactionSuccess] = useState<string | null>(null);
     const [activeGameIds, setActiveGameIds] = useState<PublicKey[]>([new PublicKey('4gc82J1Qg9vJh6BcUiTsP73NCCJNF66dvk4vcx9JP7Ri'),new PublicKey('uk8PU7wgRzrqhibkhwQzyfJ33BnvmAzRCbNNvfNWVVd')]); //new PublicKey('DS3511vmVxC4MQpiAQawsh8ZmRTy59KqeDRH9vqUcfvd')
-    const [activeGames, setActiveGames] = useState<ActiveGame[]>([
-    {
-        worldId: new anchor.BN(1315),
-        worldPda: new PublicKey('DXkWfajEXk5Ubvg27YWNvVacsacXV9o12i6UsK8X2d27'),
-        delegated: false,
-    } as ActiveGame,
-    ]);
+    const endpointToWorldMap: Record<string, { worldId: anchor.BN; worldPda: PublicKey }> = {
+        "https://supersize-sin.magicblock.app": {
+          worldId: new anchor.BN(1325),
+          worldPda: new PublicKey('L28jV8Q8vGTYAm7EJ9b749URCh9XewrWcucjDChTGX5'),
+        },
+        "https://supersize.magicblock.app": {
+          worldId: new anchor.BN(1324),
+          worldPda: new PublicKey('EZCY4KCqS36Z13h5UB5XVhKpBcojsDat97c1JYXg97Vk'),
+        },
+        "https://supersize-fra.magicblock.app": {
+          worldId: new anchor.BN(1326),
+          worldPda: new PublicKey('ACdoBTWGLAtgvfoBEkQNhyHVonzjqHzVBPJucJWF2Lxt'),
+        },
+      };
+    const [activeGames, setActiveGames] = useState<ActiveGame[]>([]);
+
+    useEffect(() => {
+        if (fastestEndpoint) {
+          const wsUrl = fastestEndpoint.replace("https", "wss");
+      
+          // Update the providerEphemeralRollup ref
+          providerEphemeralRollup.current = new anchor.AnchorProvider(
+            new anchor.web3.Connection(fastestEndpoint, {
+              wsEndpoint: wsUrl,
+            }),
+            new NodeWallet(wallet)
+          );
+      
+          // Log the updated providerEphemeralRollup to ensure it's updated
+          console.log('Updated providerEphemeralRollup:', providerEphemeralRollup.current);
+      
+          // Update the activeGames state based on the fastest endpoint
+          const { worldId, worldPda } = endpointToWorldMap[fastestEndpoint];
+          setActiveGames([{ worldId: worldId, worldPda: worldPda, delegated: false } as ActiveGame]);
+      
+          console.log(fastestEndpoint);
+        }
+      }, [fastestEndpoint]); 
 
     const [openGameInfo, setOpenGameInfo] = useState<boolean[]>(new Array(activeGames.length).fill(false));
     let entityMatch = useRef<PublicKey | null>(null);
@@ -268,11 +303,10 @@ const App: React.FC = () => {
         
         const idl = await Program.fetchIdl(component);
         //console.log("Fetched IDL:", idl);
-
         if (!idl) throw new Error('IDL not found');
 
-        return new Program(idl, providerEphemeralRollup);
-    }, [providerEphemeralRollup]);
+        return new Program(idl, providerEphemeralRollup.current);
+    }, [providerEphemeralRollup.current]);
 
     const updateFoodList = useCallback((section: any, food_index: number) => {
         const foodArray = section.food as any[];  
@@ -642,13 +676,13 @@ const App: React.FC = () => {
         foodComponentClient.current = await getComponentsClient(FOOD_COMPONENT);
         mapComponentClient.current = await getComponentsClient(MAP_COMPONENT);
 
-        if (mapComponentSubscriptionId && mapComponentSubscriptionId.current) await  providerEphemeralRollup.connection.removeAccountChangeListener(mapComponentSubscriptionId.current);
-        if (myplayerComponentSubscriptionId && myplayerComponentSubscriptionId.current) await  providerEphemeralRollup.connection.removeAccountChangeListener(myplayerComponentSubscriptionId.current);
+        if (mapComponentSubscriptionId && mapComponentSubscriptionId.current) await  providerEphemeralRollup.current.connection.removeAccountChangeListener(mapComponentSubscriptionId.current);
+        if (myplayerComponentSubscriptionId && myplayerComponentSubscriptionId.current) await  providerEphemeralRollup.current.connection.removeAccountChangeListener(myplayerComponentSubscriptionId.current);
         for (let i = 0; i < foodEntities.current.length; i++) {
-            if (foodComponentSubscriptionId && foodComponentSubscriptionId.current) await  providerEphemeralRollup.connection.removeAccountChangeListener(foodComponentSubscriptionId.current[i]);
+            if (foodComponentSubscriptionId && foodComponentSubscriptionId.current) await  providerEphemeralRollup.current.connection.removeAccountChangeListener(foodComponentSubscriptionId.current[i]);
         }
         for (let i = 0; i < playerEntities.current.length; i++) {
-            if (playersComponentSubscriptionId && playersComponentSubscriptionId.current) await  providerEphemeralRollup.connection.removeAccountChangeListener(playersComponentSubscriptionId.current[i]);
+            if (playersComponentSubscriptionId && playersComponentSubscriptionId.current) await  providerEphemeralRollup.current.connection.removeAccountChangeListener(playersComponentSubscriptionId.current[i]);
         }
 
 
@@ -658,9 +692,9 @@ const App: React.FC = () => {
                 entity: foodEntities.current[i],
             });
             if (foodComponentSubscriptionId.current === null) {
-                foodComponentSubscriptionId.current = [providerEphemeralRollup.connection.onAccountChange(foodComponenti, (accountInfo) => handleFoodComponentChange(accountInfo, i), 'processed')];
+                foodComponentSubscriptionId.current = [providerEphemeralRollup.current.connection.onAccountChange(foodComponenti, (accountInfo) => handleFoodComponentChange(accountInfo, i), 'processed')];
             } else {
-                foodComponentSubscriptionId.current = [...foodComponentSubscriptionId.current, providerEphemeralRollup.connection.onAccountChange(foodComponenti, (accountInfo) => handleFoodComponentChange(accountInfo, i), 'processed')];
+                foodComponentSubscriptionId.current = [...foodComponentSubscriptionId.current, providerEphemeralRollup.current.connection.onAccountChange(foodComponenti, (accountInfo) => handleFoodComponentChange(accountInfo, i), 'processed')];
             }
             }   
 
@@ -672,9 +706,9 @@ const App: React.FC = () => {
         console.log( i, playerEntities.current[i]);
         console.log('player component', playersComponenti);
         if (playersComponentSubscriptionId.current === null) {
-            playersComponentSubscriptionId.current = [providerEphemeralRollup.connection.onAccountChange(playersComponenti, handlePlayersComponentChange, 'processed')];
+            playersComponentSubscriptionId.current = [providerEphemeralRollup.current.connection.onAccountChange(playersComponenti, handlePlayersComponentChange, 'processed')];
         } else {
-            playersComponentSubscriptionId.current = [...playersComponentSubscriptionId.current,providerEphemeralRollup.connection.onAccountChange(playersComponenti, handlePlayersComponentChange, 'processed')];
+            playersComponentSubscriptionId.current = [...playersComponentSubscriptionId.current,providerEphemeralRollup.current.connection.onAccountChange(playersComponenti, handlePlayersComponentChange, 'processed')];
         }
         }     
         
@@ -683,7 +717,7 @@ const App: React.FC = () => {
             entity: currentPlayerEntity.current,
         });
         
-        myplayerComponentSubscriptionId.current = providerEphemeralRollup.connection.onAccountChange(myplayerComponent, handleMyPlayerComponentChange, 'processed');
+        myplayerComponentSubscriptionId.current = providerEphemeralRollup.current.connection.onAccountChange(myplayerComponent, handleMyPlayerComponentChange, 'processed');
          (playersComponentClient.current?.account as any).player1.fetch(myplayerComponent, "processed").then(updateMyPlayer).catch((error: any) => {
             console.error("Failed to fetch account:", error);
          });
@@ -720,7 +754,7 @@ const App: React.FC = () => {
             componentId: MAP_COMPONENT,
             entity: entityMatch.current,
         });
-        mapComponentSubscriptionId.current = providerEphemeralRollup.connection.onAccountChange(mapComponent, handleMapComponentChange, 'processed');
+        mapComponentSubscriptionId.current = providerEphemeralRollup.current.connection.onAccountChange(mapComponent, handleMapComponentChange, 'processed');
         (mapComponentClient.current?.account as any).maplite.fetch(mapComponent, "processed").then(updateMap).catch((error: any) => {
             console.error("Failed to fetch account:", error);
          });
@@ -745,7 +779,7 @@ const App: React.FC = () => {
                 throw new Error('Wallet is not initialized');
             }
 
-            const signature = await providerEphemeralRollup.sendAndConfirm(transaction, [], { commitment: commitmetLevel }); 
+            const signature = await providerEphemeralRollup.current.sendAndConfirm(transaction, [], { commitment: commitmetLevel }); 
 
             // Transaction was successful
             //console.log(`Transaction confirmed: ${signature}`);
@@ -1159,6 +1193,7 @@ const App: React.FC = () => {
      */
     const joinGameTx = useCallback(async (selectGameId: ActiveGame) => {
         if (!playerKey) throw new WalletNotConnectedError();
+        if (isSubmitting) return null;
         //if (!entityMatch.current) throw new WalletNotConnectedError(); 
         setScreenSize({width:selectGameId.size, height:selectGameId.size});
         const gameInfo = selectGameId; 
@@ -1191,7 +1226,7 @@ const App: React.FC = () => {
                 entity: foodEntityPda,
             });
             const foodComponentClient= await getComponentsClient(FOOD_COMPONENT);
-            const foodacc = await providerEphemeralRollup.connection.getAccountInfo(
+            const foodacc = await providerEphemeralRollup.current.connection.getAccountInfo(
                 foodComponentPda, "processed"
             );
             if(foodacc){
@@ -1306,7 +1341,7 @@ const App: React.FC = () => {
             const {
                 context: { slot: minContextSlot },
                 value: { blockhash, lastValidBlockHeight }
-            } = await providerEphemeralRollup.connection.getLatestBlockhashAndContext();
+            } = await providerEphemeralRollup.current.connection.getLatestBlockhashAndContext();
 
             if (!walletRef.current) {
                 throw new Error('Wallet is not initialized');
@@ -1314,7 +1349,7 @@ const App: React.FC = () => {
             transaction.recentBlockhash = blockhash;
             transaction.feePayer = walletRef.current.publicKey;
             transaction.sign(walletRef.current);
-            const signature = await providerEphemeralRollup.connection.sendRawTransaction(
+            const signature = await providerEphemeralRollup.current.connection.sendRawTransaction(
                 transaction.serialize(), 
                 { skipPreflight: true } // We don't want to do preflight in most cases
             );
@@ -1371,7 +1406,7 @@ const App: React.FC = () => {
               const {
                   context: { slot: minContextSlot },
                   value: { blockhash, lastValidBlockHeight }
-              } = await providerEphemeralRollup.connection.getLatestBlockhashAndContext();
+              } = await providerEphemeralRollup.current.connection.getLatestBlockhashAndContext();
   
               if (!walletRef.current) {
                   throw new Error('Wallet is not initialized');
@@ -1379,7 +1414,7 @@ const App: React.FC = () => {
               transaction.recentBlockhash = blockhash;
               transaction.feePayer = walletRef.current.publicKey;
               transaction.sign(walletRef.current);
-              const signature = await providerEphemeralRollup.connection.sendRawTransaction(
+              const signature = await providerEphemeralRollup.current.connection.sendRawTransaction(
                   transaction.serialize(), 
                   { skipPreflight: true } // We don't want to do preflight in most cases
               );
@@ -1424,7 +1459,7 @@ const App: React.FC = () => {
         const {
             context: { slot: minContextSlot },
             value: { blockhash, lastValidBlockHeight }
-        } = await providerEphemeralRollup.connection.getLatestBlockhashAndContext();
+        } = await providerEphemeralRollup.current.connection.getLatestBlockhashAndContext();
 
         if (!walletRef.current) {
             throw new Error('Wallet is not initialized');
@@ -1448,7 +1483,7 @@ const App: React.FC = () => {
         }else{
             setGameEnded(4);
         }
-        const signature = await providerEphemeralRollup.connection.sendRawTransaction(
+        const signature = await providerEphemeralRollup.current.connection.sendRawTransaction(
             transaction.serialize(), 
             { skipPreflight: true } // We don't want to do preflight in most cases
         );
@@ -1484,19 +1519,19 @@ const App: React.FC = () => {
                     setFoodListLen([]);
 
                     if (mapComponentSubscriptionId?.current) {
-                        await providerEphemeralRollup.connection.removeAccountChangeListener(mapComponentSubscriptionId.current);
+                        await providerEphemeralRollup.current.connection.removeAccountChangeListener(mapComponentSubscriptionId.current);
                     }
                     if (myplayerComponentSubscriptionId?.current) {
-                        await providerEphemeralRollup.connection.removeAccountChangeListener(myplayerComponentSubscriptionId.current);
+                        await providerEphemeralRollup.current.connection.removeAccountChangeListener(myplayerComponentSubscriptionId.current);
                     }
                     if (foodComponentSubscriptionId?.current) {
                         for (let i = 0; i < foodEntities.current.length; i++) {
-                            await providerEphemeralRollup.connection.removeAccountChangeListener(foodComponentSubscriptionId.current[i]);
+                            await providerEphemeralRollup.current.connection.removeAccountChangeListener(foodComponentSubscriptionId.current[i]);
                         }
                     }
                     if (playersComponentSubscriptionId?.current) {
                         for (let i = 0; i < playerEntities.current.length; i++) {
-                            await providerEphemeralRollup.connection.removeAccountChangeListener(playersComponentSubscriptionId.current[i]);
+                            await providerEphemeralRollup.current.connection.removeAccountChangeListener(playersComponentSubscriptionId.current[i]);
                         }
                     }
                 }
@@ -1547,7 +1582,7 @@ const App: React.FC = () => {
         const processSessionEphemTransaction = async (
             transaction: anchor.web3.Transaction
         ): Promise<string> => {
-            const signature = await providerEphemeralRollup.connection.sendRawTransaction(
+            const signature = await providerEphemeralRollup.current.connection.sendRawTransaction(
                 transaction.serialize(), 
                 { skipPreflight: true } // We don't want to do preflight in most cases
             );
@@ -1685,7 +1720,7 @@ const App: React.FC = () => {
                 const {
                     context: { slot: minContextSlot },
                     value: { blockhash, lastValidBlockHeight }
-                } = await providerEphemeralRollup.connection.getLatestBlockhashAndContext();
+                } = await providerEphemeralRollup.current.connection.getLatestBlockhashAndContext();
     
                 if (!walletRef.current) {
                     throw new Error('Wallet is not initialized');
@@ -1886,7 +1921,7 @@ const App: React.FC = () => {
             const {
                 context: { slot: minContextSlot },
                 value: { blockhash, lastValidBlockHeight }
-            } = await providerEphemeralRollup.connection.getLatestBlockhashAndContext();
+            } = await providerEphemeralRollup.current.connection.getLatestBlockhashAndContext();
 
             if (!walletRef.current) {
                 throw new Error('Wallet is not initialized');
@@ -1896,7 +1931,7 @@ const App: React.FC = () => {
             allTransaction.recentBlockhash = blockhash;
             allTransaction.feePayer = walletRef.current.publicKey;
             allTransaction.sign(walletRef.current);
-            const signature = await providerEphemeralRollup.connection.sendRawTransaction(
+            const signature = await providerEphemeralRollup.current.connection.sendRawTransaction(
                 allTransaction.serialize(), 
                 { skipPreflight: true } // We don't want to do preflight in most cases
             );
@@ -2111,7 +2146,7 @@ const App: React.FC = () => {
                 const ComputeBudgetProgram = require('@solana/web3.js').ComputeBudgetProgram;
                 //const { ConfirmOptions } = require('@solana/web3.js');
         
-                const  mainnet_connection =  new Connection("https://mainnet.helius-rpc.com/?api-key=cba33294-aa96-414c-9a26-03d5563aa676"); 
+                const  mainnet_connection =  new Connection("https://silent-cosmopolitan-dream.solana-mainnet.quiknode.pro/f9a0fac4ae97977dcab196a77654afc77b1976f5/"); //"https://mainnet.helius-rpc.com/?api-key=cba33294-aa96-414c-9a26-03d5563aa676"
                 const connectedWalletPublicKey = user_wallet; //new PublicKey(user_wallet);
                 const tokenAccounts = await mainnet_connection.getParsedTokenAccountsByOwner(
                     connectedWalletPublicKey, 
@@ -2245,7 +2280,7 @@ const App: React.FC = () => {
                     
                     try {
                         const mapComponentClient = await getComponentsClient(MAP_COMPONENT);
-                        const mapacc = await providerEphemeralRollup.connection.getAccountInfo(
+                        const mapacc = await providerEphemeralRollup.current.connection.getAccountInfo(
                             mapComponentPda, "processed"
                         );
                         if (mapacc) {
@@ -2261,6 +2296,7 @@ const App: React.FC = () => {
                                 return updatedGames;
                             });
                         } else {
+                            console.log(providerEphemeralRollup.current)
                             console.log(`No account info found for game ID ${activeGames[i].worldId}`);
                         }
                     } catch (error) {
@@ -2273,7 +2309,7 @@ const App: React.FC = () => {
             fetchAndLogMapData();
         
             // Dependency array to trigger this effect whenever activeGameIds changes
-        }, [openGameInfo]);
+        }, [openGameInfo, activeGames]);
         
         useEffect(() => {
         const renderPanel = (buildViewer: number) => {
@@ -2654,7 +2690,7 @@ const App: React.FC = () => {
                             </div>
                             <div className="gameInfo" style={{ display: "flex", flexDirection: "column", fontSize:"1rem", paddingTop:"0.2em", overflow:"hidden", width:"100%" }}>
                                     <span style={{ opacity: "0.7", fontSize: "0.7rem", marginBottom:"5px" }}></span>
-                                    <span>{activeGames[0].name} {/*<p style={{opacity: "0.7", fontSize:"10px", display:"inline-flex"}}>[demo]</p> */}</span>
+                                    <span>{activeGames.length > 0 ? activeGames[0].name : "loading"} {/*<p style={{opacity: "0.7", fontSize:"10px", display:"inline-flex"}}>[demo]</p> */}</span>
                                     {openGameInfo[0] ? (
                                     <>
                                     <span style={{ opacity: "0.7", fontSize: "0.7rem", marginBottom:"5px" }}>players: {activeGames[0].active_players} / {activeGames[0].max_players}</span>

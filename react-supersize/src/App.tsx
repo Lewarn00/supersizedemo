@@ -204,8 +204,8 @@ const App: React.FC = () => {
           worldPda: new PublicKey('DwJuJ4DXzZHu4ba58s79SzxRAuNRmEZyP18Vw1u544vR'),
         },
         "https://supersize.magicblock.app": {
-          worldId: new anchor.BN(1335),
-          worldPda: new PublicKey('Dn2L1z85BeWgGitaEUk6buMTZ2Zy2egcaBLUaHqc1Bhh'),
+          worldId: new anchor.BN(1339),
+          worldPda: new PublicKey('2tNAqh9kTgdVYS9eVFacVbAXgiwSL43k7bkJgCByoxky'),
         },
         "https://supersize-fra.magicblock.app": {
           worldId: new anchor.BN(1337),

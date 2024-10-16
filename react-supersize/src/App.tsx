@@ -200,16 +200,16 @@ const App: React.FC = () => {
     const [activeGameIds, setActiveGameIds] = useState<PublicKey[]>([new PublicKey('4gc82J1Qg9vJh6BcUiTsP73NCCJNF66dvk4vcx9JP7Ri'),new PublicKey('uk8PU7wgRzrqhibkhwQzyfJ33BnvmAzRCbNNvfNWVVd')]); //new PublicKey('DS3511vmVxC4MQpiAQawsh8ZmRTy59KqeDRH9vqUcfvd')
     const endpointToWorldMap: Record<string, { worldId: anchor.BN; worldPda: PublicKey }> = {
         "https://supersize-sin.magicblock.app": {
-          worldId: new anchor.BN(1333),
-          worldPda: new PublicKey('DkNt2CtkSi67Aa4FrQqK7g4iJ3bSmNjvthhXToN8iiwF'),
+          worldId: new anchor.BN(1336),
+          worldPda: new PublicKey('DwJuJ4DXzZHu4ba58s79SzxRAuNRmEZyP18Vw1u544vR'),
         },
         "https://supersize.magicblock.app": {
-          worldId: new anchor.BN(1331),
-          worldPda: new PublicKey('5rHEYJ6vkMjY9SXnMYqy9yriCmZnHAXJvRdF52hTe1K3'),
+          worldId: new anchor.BN(1335),
+          worldPda: new PublicKey('Dn2L1z85BeWgGitaEUk6buMTZ2Zy2egcaBLUaHqc1Bhh'),
         },
         "https://supersize-fra.magicblock.app": {
-          worldId: new anchor.BN(1332),
-          worldPda: new PublicKey('DB7ukpwNQWKwQaQsT2ExkFDiS3VkLcgczaRH2GVoTHdv'),
+          worldId: new anchor.BN(1337),
+          worldPda: new PublicKey('7gjMMPjKprSmsAu2ZajajZ5gtEMZ5BRgy9sMeD7aYcPw'),
         },
       };
     const [activeGames, setActiveGames] = useState<ActiveGame[]>([]);

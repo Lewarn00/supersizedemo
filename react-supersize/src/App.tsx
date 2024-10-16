@@ -94,7 +94,7 @@ type ActiveGame = {
 
 const App: React.FC = () => {
     //let { connection } =  useConnection();
-    const  connection =  new Connection("https://sly-blue-cherry.solana-devnet.quiknode.pro/13351562e034e23c97c16dffce573f7a384c080b/"); //"https://devnet.helius-rpc.com/?api-key=cba33294-aa96-414c-9a26-03d5563aa676"); 
+    const  connection =  new Connection("https://devnet.helius-rpc.com/?api-key=d3b1a6cd-dbcb-4f1a-a95c-a1ac612ce063"); //"https://devnet.helius-rpc.com/?api-key=cba33294-aa96-414c-9a26-03d5563aa676"); 
     const { publicKey, sendTransaction } = useWallet(); 
     let userKey = publicKey;
     const [savedPublicKey, setSavedPublicKey] = useState<PublicKey | null>(null);
@@ -119,11 +119,11 @@ const App: React.FC = () => {
       const [fastestEndpoint, setFastestEndpoint] = useState<string | null>(null);
       const [wsEndpoint, setWsEndpoint] = useState<string | null>(null);
       const [pings, setPings] = useState<Record<string, number>>({});
-      
+      const [enpointDone, setEndpointDone] = useState<boolean>(false);
       useEffect(() => {
         const checkEndpoints = async () => {
           const results: Record<string, number> = {};
-          
+          setEndpointDone(false);
           for (const endpoint of endpoints) {
             const pingTime = await pingEndpoint(endpoint);
             results[endpoint] = pingTime;
@@ -200,16 +200,16 @@ const App: React.FC = () => {
     const [activeGameIds, setActiveGameIds] = useState<PublicKey[]>([new PublicKey('4gc82J1Qg9vJh6BcUiTsP73NCCJNF66dvk4vcx9JP7Ri'),new PublicKey('uk8PU7wgRzrqhibkhwQzyfJ33BnvmAzRCbNNvfNWVVd')]); //new PublicKey('DS3511vmVxC4MQpiAQawsh8ZmRTy59KqeDRH9vqUcfvd')
     const endpointToWorldMap: Record<string, { worldId: anchor.BN; worldPda: PublicKey }> = {
         "https://supersize-sin.magicblock.app": {
-          worldId: new anchor.BN(1325),
-          worldPda: new PublicKey('L28jV8Q8vGTYAm7EJ9b749URCh9XewrWcucjDChTGX5'),
+          worldId: new anchor.BN(1333),
+          worldPda: new PublicKey('DkNt2CtkSi67Aa4FrQqK7g4iJ3bSmNjvthhXToN8iiwF'),
         },
         "https://supersize.magicblock.app": {
-          worldId: new anchor.BN(1324),
-          worldPda: new PublicKey('EZCY4KCqS36Z13h5UB5XVhKpBcojsDat97c1JYXg97Vk'),
+          worldId: new anchor.BN(1331),
+          worldPda: new PublicKey('5rHEYJ6vkMjY9SXnMYqy9yriCmZnHAXJvRdF52hTe1K3'),
         },
         "https://supersize-fra.magicblock.app": {
-          worldId: new anchor.BN(1326),
-          worldPda: new PublicKey('ACdoBTWGLAtgvfoBEkQNhyHVonzjqHzVBPJucJWF2Lxt'),
+          worldId: new anchor.BN(1332),
+          worldPda: new PublicKey('DB7ukpwNQWKwQaQsT2ExkFDiS3VkLcgczaRH2GVoTHdv'),
         },
       };
     const [activeGames, setActiveGames] = useState<ActiveGame[]>([]);
@@ -232,7 +232,7 @@ const App: React.FC = () => {
           // Update the activeGames state based on the fastest endpoint
           const { worldId, worldPda } = endpointToWorldMap[fastestEndpoint];
           setActiveGames([{ worldId: worldId, worldPda: worldPda, delegated: false } as ActiveGame]);
-      
+          setEndpointDone(true);
           console.log(fastestEndpoint);
         }
       }, [fastestEndpoint]); 
@@ -546,6 +546,7 @@ const App: React.FC = () => {
 
     const updateMap = useCallback((map: any) => {
         const playerArray = map.players as any[];
+        if(activeGames[0]){
         const playerEntityIds = playerArray.map((player, index) => {
             const seed = player.toString().substring(0, 7);
             const newPlayerEntityPda = FindEntityPda({
@@ -604,6 +605,7 @@ const App: React.FC = () => {
         }else{
             playerEntities.current = playerEntityIds;
             
+        }
         }
     }, [setPlayers, setCurrentPlayer, setCurrentPlayerOnchain, playerKey, food]);
 
@@ -733,7 +735,8 @@ const App: React.FC = () => {
              .fetch(foodComponenti, "processed")
              .then((fetchedData: any) => updateFoodList(fetchedData, i))
              .catch((error: any) => {
-               console.error("Failed to fetch account:", error);
+               //console.error("Failed to fetch account:", error);
+               //food not populated
              });
         }
 
@@ -1468,8 +1471,6 @@ const App: React.FC = () => {
         transaction.feePayer = walletRef.current.publicKey;
         transaction.sign(walletRef.current);
         console.log('exiting')
-        currentPlayerEntity.current = null;
-        entityMatch.current = null;
         setGameId(null);
         setGameEnded(2);
         if(savedPublicKey){
@@ -1487,14 +1488,37 @@ const App: React.FC = () => {
             transaction.serialize(), 
             { skipPreflight: true } // We don't want to do preflight in most cases
         );
+        if (signature != null) {
+        if(currentPlayerEntity.current){
+            const myplayerComponent = FindComponentPda({
+                componentId: PLAYER_COMPONENT,
+                entity: currentPlayerEntity.current,
+            });
+            const allowUndelegateIx = createAllowUndelegationInstruction({
+                delegatedAccount: myplayerComponent,
+                ownerProgram: PLAYER_COMPONENT,
+              });
+              const undelegateIx = createUndelegateInstruction({
+                payer: playerKey,
+                delegatedAccount: myplayerComponent,
+                ownerProgram: PLAYER_COMPONENT,
+                reimbursement: playerKey,
+              });
+              const tx = new anchor.web3.Transaction()
+                  .add(allowUndelegateIx)
+                  .add(undelegateIx);
+              await provider.sendAndConfirm(tx, [], { skipPreflight: true });
+              const playerdelsignature = await submitTransaction(tx, "confirmed", true);
+              //console.log(playerdelsignature)
+              playersComponentSubscriptionId.current = [];
+              currentPlayerEntity.current = null;
+              entityMatch.current = null;
+              foodEntities.current = [];
+        }
+        }
         //const signature = await submitTransactionER(transaction, "processed", false);  //providerEphemeralRollup.sendAndConfirm(transaction); 
         //console.log(signature)
-        if (signature != null) {
-            playersComponentSubscriptionId.current = [];
-            entityMatch.current = null;
-            setGameId(null);
-        }
-
+        
     }, [playerKey, submitTransaction, subscribeToGame]);
 
     useEffect(() => {
@@ -1507,33 +1531,56 @@ const App: React.FC = () => {
                     currentPlayer.x === 50000 &&
                     currentPlayer.y === 50000
                 ) {
-                    currentPlayerEntity.current = null;
-                    entityMatch.current = null;
-                    setGameId(null);
-                    if(gameEnded==0){
-                        setGameEnded(1);
-                    }
-                    setPlayers([]);
-                    setFood([]);
-                    setAllFood([]);
-                    setFoodListLen([]);
-
-                    if (mapComponentSubscriptionId?.current) {
-                        await providerEphemeralRollup.current.connection.removeAccountChangeListener(mapComponentSubscriptionId.current);
-                    }
-                    if (myplayerComponentSubscriptionId?.current) {
-                        await providerEphemeralRollup.current.connection.removeAccountChangeListener(myplayerComponentSubscriptionId.current);
-                    }
-                    if (foodComponentSubscriptionId?.current) {
-                        for (let i = 0; i < foodEntities.current.length; i++) {
-                            await providerEphemeralRollup.current.connection.removeAccountChangeListener(foodComponentSubscriptionId.current[i]);
+                    if(currentPlayerEntity.current && gameId && gameEnded==0){
+                        const myplayerComponent = FindComponentPda({
+                            componentId: PLAYER_COMPONENT,
+                            entity: currentPlayerEntity.current,
+                        });
+                        const allowUndelegateIx = createAllowUndelegationInstruction({
+                            delegatedAccount: myplayerComponent,
+                            ownerProgram: PLAYER_COMPONENT,
+                          });
+                          const undelegateIx = createUndelegateInstruction({
+                            payer: playerKey,
+                            delegatedAccount: myplayerComponent,
+                            ownerProgram: PLAYER_COMPONENT,
+                            reimbursement: playerKey,
+                          });
+                          const tx = new anchor.web3.Transaction()
+                              .add(allowUndelegateIx)
+                              .add(undelegateIx);
+                          await provider.sendAndConfirm(tx, [], { skipPreflight: true });
+                          const playerdelsignature = await submitTransaction(tx, "confirmed", true);
+                          playersComponentSubscriptionId.current = [];
+                          currentPlayerEntity.current = null;
+                          entityMatch.current = null;
+                          foodEntities.current = [];
+                          setGameId(null);
+                          if(gameEnded==0){
+                              setGameEnded(1);
+                          }
                         }
-                    }
-                    if (playersComponentSubscriptionId?.current) {
-                        for (let i = 0; i < playerEntities.current.length; i++) {
-                            await providerEphemeralRollup.current.connection.removeAccountChangeListener(playersComponentSubscriptionId.current[i]);
+                        setPlayers([]);
+                        setFood([]);
+                        setAllFood([]);
+                        setFoodListLen([]);
+    
+                        if (mapComponentSubscriptionId?.current) {
+                            await providerEphemeralRollup.current.connection.removeAccountChangeListener(mapComponentSubscriptionId.current);
                         }
-                    }
+                        if (myplayerComponentSubscriptionId?.current) {
+                            await providerEphemeralRollup.current.connection.removeAccountChangeListener(myplayerComponentSubscriptionId.current);
+                        }
+                        if (foodComponentSubscriptionId?.current) {
+                            for (let i = 0; i < foodEntities.current.length; i++) {
+                                await providerEphemeralRollup.current.connection.removeAccountChangeListener(foodComponentSubscriptionId.current[i]);
+                            }
+                        }
+                        if (playersComponentSubscriptionId?.current) {
+                            for (let i = 0; i < playerEntities.current.length; i++) {
+                                await providerEphemeralRollup.current.connection.removeAccountChangeListener(playersComponentSubscriptionId.current[i]);
+                            }
+                        }
                 }
             }
         };
@@ -1765,7 +1812,8 @@ const App: React.FC = () => {
                         .fetch(foodComponenti, "processed")
                         .then((fetchedData: any) => updateFoodList(fetchedData, i))
                         .catch((error: any) => {
-                          console.error("Failed to fetch account:", error);
+                          //console.error("Failed to fetch account:", error);
+                          //food account unpopulated
                         });
                     }
                     
@@ -1787,7 +1835,7 @@ const App: React.FC = () => {
                         //console.log( i, playerEntities.current[i]);
                         //console.log('player component', playersComponenti);
                         (playersComponentClient.current?.account as any).player1.fetch(playersComponenti, "processed").then(updatePlayers).catch((error: any) => {
-                            console.error("Failed to fetch account:", error);
+                            //console.error("Failed to fetch account:", error);
                          });
                     } 
                     //console.log('post fetch', currentPlayer.x, currentPlayer.y);
@@ -2146,7 +2194,7 @@ const App: React.FC = () => {
                 const ComputeBudgetProgram = require('@solana/web3.js').ComputeBudgetProgram;
                 //const { ConfirmOptions } = require('@solana/web3.js');
         
-                const  mainnet_connection =  new Connection("https://silent-cosmopolitan-dream.solana-mainnet.quiknode.pro/f9a0fac4ae97977dcab196a77654afc77b1976f5/"); //"https://mainnet.helius-rpc.com/?api-key=cba33294-aa96-414c-9a26-03d5563aa676"
+                const  mainnet_connection =  new Connection("https://mainnet.helius-rpc.com/?api-key=d3b1a6cd-dbcb-4f1a-a95c-a1ac612ce063"); //"https://mainnet.helius-rpc.com/?api-key=cba33294-aa96-414c-9a26-03d5563aa676"
                 const connectedWalletPublicKey = user_wallet; //new PublicKey(user_wallet);
                 const tokenAccounts = await mainnet_connection.getParsedTokenAccountsByOwner(
                     connectedWalletPublicKey, 
@@ -2285,7 +2333,7 @@ const App: React.FC = () => {
                         );
                         if (mapacc) {
                             const mapParsedData = mapComponentClient.coder.accounts.decode("maplite", mapacc.data);
-                            //console.log(`Parsed Data for game ID ${activeGames[i].worldId}:`, mapParsedData);
+                            console.log(`Parsed Data for game ID ${activeGames[i].worldId}:`, mapParsedData);
                             setActiveGames(prevActiveGames => {
                                 const updatedGames = prevActiveGames.map(game =>
                                     game.worldId === activeGames[i].worldId && game.worldPda.toString() === activeGames[i].worldPda.toString()
@@ -2309,7 +2357,7 @@ const App: React.FC = () => {
             fetchAndLogMapData();
         
             // Dependency array to trigger this effect whenever activeGameIds changes
-        }, [openGameInfo, activeGames]);
+        }, [openGameInfo, enpointDone]);
         
         useEffect(() => {
         const renderPanel = (buildViewer: number) => {

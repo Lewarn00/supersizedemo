@@ -200,16 +200,16 @@ const App: React.FC = () => {
     const [activeGameIds, setActiveGameIds] = useState<PublicKey[]>([new PublicKey('4gc82J1Qg9vJh6BcUiTsP73NCCJNF66dvk4vcx9JP7Ri'),new PublicKey('uk8PU7wgRzrqhibkhwQzyfJ33BnvmAzRCbNNvfNWVVd')]); //new PublicKey('DS3511vmVxC4MQpiAQawsh8ZmRTy59KqeDRH9vqUcfvd')
     const endpointToWorldMap: Record<string, { worldId: anchor.BN; worldPda: PublicKey }> = {
         "https://supersize-sin.magicblock.app": {
-          worldId: new anchor.BN(1336),
-          worldPda: new PublicKey('DwJuJ4DXzZHu4ba58s79SzxRAuNRmEZyP18Vw1u544vR'),
+          worldId: new anchor.BN(1355),
+          worldPda: new PublicKey('HfKR5HQupLdpnM7EREJPBK3nh13fRpe8ji61ParfTaVv'),
         },
         "https://supersize.magicblock.app": {
           worldId: new anchor.BN(1339),
           worldPda: new PublicKey('2tNAqh9kTgdVYS9eVFacVbAXgiwSL43k7bkJgCByoxky'),
         },
         "https://supersize-fra.magicblock.app": {
-          worldId: new anchor.BN(1337),
-          worldPda: new PublicKey('7gjMMPjKprSmsAu2ZajajZ5gtEMZ5BRgy9sMeD7aYcPw'),
+          worldId: new anchor.BN(1354),
+          worldPda: new PublicKey('3rJQRu39tjCHBEUGhS6VHD71ScMLDnPSh8sV9E14d4x8'),
         },
       };
     const [activeGames, setActiveGames] = useState<ActiveGame[]>([]);
@@ -1356,8 +1356,8 @@ const App: React.FC = () => {
                 transaction.serialize(), 
                 { skipPreflight: true } // We don't want to do preflight in most cases
             );
-            //const signature = await providerEphemeralRollup.sendAndConfirm(applySystem.transaction);   
-            //console.log(signature)
+            //const signature = await providerEphemeralRollup.current.sendAndConfirm(applySystem.transaction);   
+            //console.log(signature,transaction, walletRef.current.toString(), playerKey.toString())
             if (signature != null) {
                 setGameId(mapEntityPda);
                 setDelegationDone(true);
@@ -1507,9 +1507,9 @@ const App: React.FC = () => {
               const tx = new anchor.web3.Transaction()
                   .add(allowUndelegateIx)
                   .add(undelegateIx);
-              await provider.sendAndConfirm(tx, [], { skipPreflight: true });
+              //await provider.sendAndConfirm(tx, [], { skipPreflight: true });
               const playerdelsignature = await submitTransaction(tx, "confirmed", true);
-              //console.log(playerdelsignature)
+              console.log('undelegate', playerdelsignature)
               playersComponentSubscriptionId.current = [];
               currentPlayerEntity.current = null;
               entityMatch.current = null;
@@ -1549,7 +1549,6 @@ const App: React.FC = () => {
                           const tx = new anchor.web3.Transaction()
                               .add(allowUndelegateIx)
                               .add(undelegateIx);
-                          await provider.sendAndConfirm(tx, [], { skipPreflight: true });
                           const playerdelsignature = await submitTransaction(tx, "confirmed", true);
                           playersComponentSubscriptionId.current = [];
                           currentPlayerEntity.current = null;

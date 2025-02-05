@@ -1,19 +1,17 @@
 {
   "files": {
-    "main.css": "./static/css/main.4093952c.css",
-    "main.js": "./static/js/main.89c72ee1.js",
-    "static/js/648.97b301c7.chunk.js": "./static/js/648.97b301c7.chunk.js",
-    "static/js/227.1bc2aaa4.chunk.js": "./static/js/227.1bc2aaa4.chunk.js",
-    "static/media/TerminusTTF-4.49.3.ttf": "./static/media/TerminusTTF-4.49.3.30593de33b541800797b.ttf",
-    "static/media/conthrax-sb.otf": "./static/media/conthrax-sb.787c73c4164cc642bfd1.otf",
-    "index.html": "./index.html",
-    "main.4093952c.css.map": "./static/css/main.4093952c.css.map",
-    "main.89c72ee1.js.map": "./static/js/main.89c72ee1.js.map",
-    "648.97b301c7.chunk.js.map": "./static/js/648.97b301c7.chunk.js.map",
-    "227.1bc2aaa4.chunk.js.map": "./static/js/227.1bc2aaa4.chunk.js.map"
+    "main.css": "/static/css/main.0a3e36d0.css",
+    "main.js": "/static/js/main.a70be51f.js",
+    "static/js/453.ca54bf11.chunk.js": "/static/js/453.ca54bf11.chunk.js",
+    "static/media/TerminusTTF-4.49.3.ttf": "/static/media/TerminusTTF-4.49.3.30593de33b541800797b.ttf",
+    "static/media/conthrax-sb.otf": "/static/media/conthrax-sb.787c73c4164cc642bfd1.otf",
+    "index.html": "/index.html",
+    "main.0a3e36d0.css.map": "/static/css/main.0a3e36d0.css.map",
+    "main.a70be51f.js.map": "/static/js/main.a70be51f.js.map",
+    "453.ca54bf11.chunk.js.map": "/static/js/453.ca54bf11.chunk.js.map"
   },
   "entrypoints": [
-    "static/css/main.4093952c.css",
-    "static/js/main.89c72ee1.js"
+    "static/css/main.0a3e36d0.css",
+    "static/js/main.a70be51f.js"
   ]
 }
